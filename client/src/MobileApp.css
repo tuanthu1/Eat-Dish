@@ -1,0 +1,107 @@
+/* =========================================
+   MOBILE BOTTOM NAVIGATION (BẢN NÂNG CẤP SIÊU ĐẸP)
+========================================= */
+.mobile-bottom-nav { 
+    display: none; 
+}
+
+@media screen and (max-width: 768px) {
+    /* Đẩy nội dung chính lên nhiều hơn một chút cho thoáng */
+    .main-content {
+        padding-bottom: 95px !important; 
+    }
+
+    /* Thiết kế thanh menu đáy: Nền kính mờ (Frosted Glass), Bo góc sâu */
+    .mobile-bottom-nav {
+        display: flex; 
+        justify-content: space-around; 
+        align-items: center;
+        position: fixed; 
+        bottom: 0; /* Gắn chặt xuống đáy */
+        left: 0;
+        transform: none; /* Bỏ transform đi */
+        width: 100%; /* Trải dài full màn hình */
+        height: 65px;
+        background: rgba(255, 255, 255, 0.85); 
+        backdrop-filter: blur(15px) saturate(180%); 
+        -webkit-backdrop-filter: blur(15px) saturate(180%);
+        box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05); /* Bóng đổ hắt lên trên */
+        border-radius: 25px 25px 0 0; /* Chỉ bo tròn 2 góc trên */
+        border-top: 1px solid rgba(0, 0, 0, 0.08); /* Viền trên mờ */
+        z-index: 9999; 
+        padding: 0 5px;
+        padding-bottom: env(safe-area-inset-bottom); /* Fix dải đen iPhone */
+        overflow: hidden; 
+    }
+
+    /* CONTAINER CHO TỪNG TAB */
+    .nav-item-container {
+        position: relative;
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        z-index: 2;
+    }
+
+    /* Thiết kế nút bấm: Trong suốt, text nhỏ, icon lớn */
+    .nav-item { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        color: #8fa1b3; /* Màu xám nhẹ cho tab không chọn */
+        cursor: pointer; 
+        transition: all 0.3s ease;
+        background: none;
+        border: none;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* Màu khi được active */
+    .nav-item.active { 
+        color: #ff9f1c; 
+    }
+
+    
+    /* THANH TRƯỢT CHỈ THỊ (PILL INDICATOR) - TRÁI TIM CỦA THIẾT KẾ */
+    .nav-indicator {
+        position: absolute;
+        bottom: 10px;
+        left: 0;
+        height: 50px; /* Cao bằng nút bấm */
+        background: rgba(255, 159, 28, 0.1); /* Màu cam nhạt trong suốt */
+        border-radius: 25px; /* Bo góc pill */
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Hiệu ứng di chuyển mượt */
+        z-index: 1;
+        display: block;
+    }
+    
+    .nav-item.action-btn { 
+        background: linear-gradient(135deg, #ff9f1c, #e17055); 
+        color: white !important; 
+        width: 50px; 
+        height: 50px; 
+        border-radius: 50%; 
+        
+        transform: translateY(-5px); 
+        
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.05), 0 8px 25px rgba(255, 159, 28, 0.4); 
+        flex: none; 
+        border: 4px solid #fff; 
+    }
+    
+    .nav-item.action-btn .material-icons { 
+        font-size: 30px; 
+        margin-bottom: 0; 
+        font-variation-settings: 'FILL' 1, 'wght' 600;
+        transform: none !important;
+    }
+    
+    .nav-item.action-btn span:not(.material-icons) { 
+        display: none; 
+    }
+}
