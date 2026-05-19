@@ -1,20 +1,37 @@
 # EatDish-Project
 
-## Mô tả
-- **Tên:** EatDish-Project
-- **Mục tiêu:** Ứng dụng web chia sẻ công thức nấu ăn với frontend (Vite + React) trong `client/` và backend (Node.js + Express + MongoDB) trong `server/`.
+## Tổng quan
+EatDish-Project là một ứng dụng web chia sẻ công thức nấu ăn. Frontend dùng Vite + React (thư mục `client/`), backend là Node.js + Express kết nối MongoDB (thư mục `server/`).
 
-## Yêu cầu trước
+## Tính năng chính
+- Đăng ký/đăng nhập người dùng (JWT)
+- Tạo / chỉnh sửa / xoá công thức
+- Đánh giá & bình luận công thức
+- Tìm kiếm, phân loại và lọc công thức
+- Thanh toán gói Premium (nếu cấu hình)
+
+## Yêu cầu
 - Node.js >= 16
 - npm hoặc yarn
 - MongoDB (local hoặc Atlas)
 
-## Cấu trúc chính
-- **client:** mã nguồn frontend (Vite + React)
-- **server:** API và logic backend (Express, models, controllers)
+## Cấu trúc dự án (tóm tắt)
+- `client/` — Frontend (Vite + React)
+- `server/` — Backend (Express, controllers, models, routes)
+- `server/models` — các mô hình Mongoose
+- `server/controllers` — logic xử lý request
+- `server/routes` — định nghĩa route API
 
-## Cài đặt và chạy (phát triển)
-1. Cài đặt dependencies cho frontend:
+## Thiết lập môi trường (phát triển)
+
+1) Clone repo
+
+```bash
+git clone <repo-url> 
+cd EatDish-Project
+```
+
+2) Frontend
 
 ```bash
 cd client
@@ -22,56 +39,76 @@ npm install
 npm run dev
 ```
 
-2. Cài đặt dependencies cho backend và khởi chạy server:
+Frontend mặc định chạy ở `http://localhost:5173` (theo cấu hình Vite).
+
+3) Backend
 
 ```bash
 cd server
 npm install
-# sửa file .env_example thành .env và thay các cấu trúc bên trong thành của bạn
-npm run dev # hoặc npm start tùy cấu hình package.json
+# sao chép file mẫu .env_example thành .env và chỉnh các biến
+cp .env_example .env   # trên PowerShell dùng: Copy-Item .env_example .env
+npm run dev # hoặc npm start
 ```
 
-## Biến môi trường mẫu (`server/.env`)
-- `PORT`=3000
-- `MONGO_URI`=<kết nối MongoDB>
-- `JWT_SECRET`=<khóa bí mật cho JWT>
-- `CLIENT_URL`=<địa chỉ frontend, ví dụ http://localhost:5173>
-- `STRIPE_SECRET_KEY`=<nếu dùng Stripe để thanh toán>
-- `STRIPE_WEBHOOK_SECRET`=<nếu dùng Stripe webhook>
-- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS` (nếu gửi email xác thực / reset)
+Backend mặc định lắng nghe ở `http://localhost:5000` (hoặc port trong `.env`).
 
-Lưu ý: Chỉ thêm những biến bạn thực sự sử dụng trong repo.
+## Biến môi trường (mẫu)
+Nội dung `server/.env_example` hiện tại:
 
-## Migrations / Seed
-- Nếu dự án có script migrate, chạy tương tự:
-
-```bash
-cd server
-node migrate.js
+```
+PORT=5000
+MONGO_URI=
+MAIL_USER=
+MAIL_PASS=
+FRONTEND_URL=https://localhost
+CLIENT_URL=http://localhost:5173
+BASE_URL=http://localhost:5000
+JWT_SECRET=
+PAYOS_CLIENT_ID=
+PAYOS_API_KEY=
+PAYOS_CHECKSUM_KEY=
+DOMAIN=http://localhost:5173
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+GROQ_API_KEY=
+GROQ_MODEL=
+WEATHER_API_KEY=
 ```
 
-## Build cho production
-- Frontend:
+Giải thích nhanh các biến quan trọng:
+- `MONGO_URI` — chuỗi kết nối MongoDB (bắt buộc)
+- `JWT_SECRET` — khóa bí mật để ký token JWT
+- `PORT` — port backend
+- `CLIENT_URL` / `FRONTEND_URL` — URL frontend để cấu hình CORS
+- Cloudinary / Mail / PAYOS / Stripe vars — chỉ cần cấu hình nếu bạn dùng các dịch vụ đó
 
-```bash
-cd client
-npm run build
-# deploy phần build theo hướng dẫn hosting
-```
+## Scripts hay dùng
+- Frontend: `client/npm run dev`, `client/npm run build`
+- Backend: `server/npm run dev` (thường dùng nodemon), `server/npm start` (production)
 
-- Backend: cấu hình `NODE_ENV=production` và chạy process manager (pm2, docker, etc.)
+Kiểm tra `package.json` trong hai thư mục để biết chi tiết scripts.
 
-## Kiểm tra và debug
-- Kiểm tra logs backend để biết lỗi kết nối DB hoặc lỗi API.
-- Sử dụng `Postman` / `curl` để test endpoint API.
+## Build & Deploy (tóm tắt)
+- Frontend: `cd client && npm run build` → upload thư mục `dist` lên hosting (Netlify, Vercel, static server...)
+- Backend: Thiết lập biến môi trường production, dùng PM2 / Docker / hệ thống hosting để chạy `npm start`.
 
-## Đóng góp
-- Tạo issue hoặc fork repo và gửi pull request.
+Ví dụ nhanh với Docker (gợi ý):
+
+1. Tạo `Dockerfile` cho server và `Dockerfile` cho client
+2. Xây image và chạy container, cấu hình biến môi trường và mạng nối giữa client/server.
+
+## Kiểm tra & Debug
+- Kiểm tra console logs server để biết lỗi kết nối DB hoặc lỗi runtime.
+- Dùng `Postman` hoặc `Insomnia` để gọi các endpoint API.
+- Nếu lỗi CORS, kiểm tra `CLIENT_URL`/CORS middleware trên server.
+
+## Contributing
+- Mở issue mô tả lỗi/tính năng
+- Tạo branch feature/fix, commit, và gửi Pull Request
 
 ## Liên hệ
-- Thông tin liên hệ:
- - https://fb.com/tuanthu2911
+- Tác giả/Người duy trì: https://fb.com/tuanthu2911
 
 ---
-
-> Tệp này là bản tóm tắt nhanh. Nếu bạn muốn mình mở rộng thành README chi tiết (mô tả environment cụ thể, scripts từ package.json, hướng dẫn deploy Docker, hoặc hướng dẫn test), nói mình biết yêu cầu cụ thể.
