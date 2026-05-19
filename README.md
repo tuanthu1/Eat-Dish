@@ -27,7 +27,7 @@ EatDish-Project là một ứng dụng web chia sẻ công thức nấu ăn. Fro
 1) Clone repo
 
 ```bash
-git clone <repo-url> 
+git clone https://github.com/tuanthu1/Eat-Dish.git
 cd EatDish-Project
 ```
 
