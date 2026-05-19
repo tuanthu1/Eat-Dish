@@ -18,8 +18,16 @@ exports.getAllPosts = async (req, res) => {
         }
 
         const posts = await CommunityPost.find(query)
-            .populate('user', 'fullname username avatar')
+            .populate('user', 'fullname username avatar is_premium')
             .sort({ createdAt: -1 });
+            
+        // ƯU TIÊN HIỂN THỊ BÀI CỦA PREMIUM LÊN ĐẦU
+        posts.sort((a,b) => {
+            const aPremium = a.user?.is_premium ? 1 : 0;
+            const bPremium = b.user?.is_premium ? 1 : 0;
+            if (bPremium !== aPremium) return bPremium - aPremium;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        });
 
         const postsWithCount = await Promise.all(
             posts.map(async (post) => {
@@ -35,6 +43,7 @@ exports.getAllPosts = async (req, res) => {
                     user_id: post.user?._id,
                     fullname: post.user?.fullname || post.user?.username || 'Người dùng',
                     avatar: post.user?.avatar || '',
+                    author_is_premium: post.user?.is_premium,
                     created_at: post.createdAt,
                     comments_count: commentsCount,
                     likes_count: likesCount,
@@ -88,12 +97,6 @@ exports.addComment = async (req, res) => {
         await CommunityPost.findByIdAndUpdate(postId, {
             $addToSet: { comments: newComment._id }
         });
-
-        await ActivityLog.create({
-            admin: req.user ? req.user.id : null,
-            action: "Tài khoản " + userId + " đã tạo một bình luận mới trên cộng đồng với nội dung: " + content
-        });
-        
         const userData = await User.findById(userId).select('fullname');
         const senderName = userData?.fullname || "Ai đó";
 
@@ -212,7 +215,22 @@ exports.deletePost = async (req, res) => {
         if (post.user.toString() !== userId.toString()) {
             return res.status(403).json({ message: "Bạn không có quyền xóa bài này" });
         }
-
+        
+        const isAdmin = req.user && req.user.id;
+        
+        await ActivityLog.create({
+            admin: isAdmin || null,
+            action: "Tài khoản " + userId + " đã xóa một bài viết trên cộng đồng với nội dung: " + post.content
+        });
+        
+        if (isAdmin) {
+            await Notification.create({
+                user: post.user,
+                message: "Bài viết cộng đồng của bạn vừa bị khóa do vi phạm chính sách của EatDish. Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ với chúng tôi để được hỗ trợ.",
+                type: 'post_deleted'
+            });
+        }
+        
         await CommunityPost.findByIdAndDelete(id);
         return res.status(200).json({ message: "Đã xóa bài viết" });
     } catch (err) {
@@ -228,10 +246,6 @@ exports.updatePost = async (req, res) => {
 
         const post = await CommunityPost.findByIdAndUpdate(id, { content }, { returnDocument: 'after' });
         if (!post) return res.status(404).json({ message: "Không tìm thấy bài viết" });
-        await ActivityLog.create({
-            admin: req.user ? req.user.id : null,
-            action: "Tài khoản " + post.user + " đã cập nhật bài viết trên cộng đồng với nội dung mới: " + content
-        });
         res.json({ status: 'success' });
     } catch (err) {
         res.status(500).json({ error: err.message });

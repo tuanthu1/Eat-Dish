@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
     is_premium: { type: Boolean, default: false },
     premium_since: { type: Date },
     premium_until: { type: Date },
+    premium_package_id: { type: mongoose.Schema.Types.ObjectId, ref: 'PremiumPackage' }, // Gói premium mà user đang sử dụng
     
     // AI Chatbot
     daily_chat_count: { type: Number, default: 0 },

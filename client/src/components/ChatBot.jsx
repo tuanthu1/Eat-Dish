@@ -37,7 +37,7 @@ const ChatBot = () => {
     const [inputValue, setInputValue] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [isGuest, setIsGuest] = useState(() => {
-        return !localStorage.getItem("token") && !sessionStorage.getItem("token");
+        return !localStorage.getItem("user") && !localStorage.getItem("eatdish_user_id");
     });
     const [showBubble, setShowBubble] = useState(true);
 
@@ -46,7 +46,33 @@ const ChatBot = () => {
     const navigate = useNavigate();
     useEffect(() => {
         localStorage.setItem("eatdish_chat_history", JSON.stringify(messages));
+        
+        // Lưu chat vào database nếu user đã đăng nhập
+        saveChatToDatabase();
     }, [messages]);
+
+    // Hàm lưu chat vào database
+    const saveChatToDatabase = async () => {
+        try {
+            const userStr = localStorage.getItem("user");
+            if (!userStr) return; // Nếu không login thì không lưu
+            
+            const user = JSON.parse(userStr);
+            if (!user?.id) return;
+
+            // Chỉ lưu nếu có ít nhất 1 tin nhắn từ user
+            const hasUserMessage = messages.some(m => !m.isBot);
+            if (!hasUserMessage) return;
+
+            await axiosClient.post('/chat-history/save', {
+                userId: user.id,
+                messages: messages,
+                title: `Chat ${new Date().toLocaleDateString('vi-VN')}`
+            });
+        } catch (err) {
+            console.log('Lỗi lưu chat:', err);
+        }
+    };
     useEffect(() => {
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
@@ -63,9 +89,9 @@ const ChatBot = () => {
     // Kiểm tra đăng nhập
     useEffect(() => {
         const checkAuth = () => {
-            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-            setIsGuest(!token);
-            if (!token) {
+            const userStr = localStorage.getItem("user") || localStorage.getItem("eatdish_user_id");
+            setIsGuest(!userStr);
+            if (!userStr) {
                 localStorage.removeItem("eatdish_chat_history");
                 setMessages([{ text: "Xin chào! Bạn muốn tìm món gì hôm nay? (Gà, Bò, Hải sản...)", isBot: true }]);
             }

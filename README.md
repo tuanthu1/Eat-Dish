@@ -1,129 +1,77 @@
-# EatDish Project
+# EatDish-Project
 
-EatDish is a full-stack recipe and cooking platform built with React on the frontend and Express/MongoDB on the backend. The app supports recipe browsing, filtering, reviews, chat, premium features, payment handling, and admin management.
+## Mô tả
+- **Tên:** EatDish-Project
+- **Mục tiêu:** Ứng dụng web chia sẻ công thức nấu ăn với frontend (Vite + React) trong `client/` và backend (Node.js + Express + MongoDB) trong `server/`.
 
-## Tech Stack
+## Yêu cầu trước
+- Node.js >= 16
+- npm hoặc yarn
+- MongoDB (local hoặc Atlas)
 
-- Frontend: React, Vite, React Router, Axios, React Toastify, Recharts
-- Backend: Node.js, Express, MongoDB, Mongoose
-- Integrations: Cloudinary, PayOS, Nodemailer, JWT, Google OAuth, Groq/OpenAI
+## Cấu trúc chính
+- **client:** mã nguồn frontend (Vite + React)
+- **server:** API và logic backend (Express, models, controllers)
 
-## Main Features
-
-- Browse and search recipes
-- Filter recipes by keyword, ingredients, calories, time, and classification
-- View recipe details, comments, and reviews
-- User authentication and profile management
-- Premium package and payment flow
-- Community, chat, and notification features
-- Admin dashboard for managing users, recipes, settings, reports, and content
-
-## Project Structure
-
-```text
-EatDish-Project/
-├── client/   # React + Vite frontend
-├── server/   # Express + MongoDB backend
-├── eatdish.sql
-└── documentation files
-```
-
-## Requirements
-
-- Node.js 18+ recommended
-- npm
-- MongoDB database
-- Cloudinary account for image uploads
-- PayOS credentials if you want to test payments
-- SMTP credentials for email features
-
-## Setup
-
-### 1. Clone the repository
-
-```bash
-git clone <your-repo-url>
-cd EatDish-Project
-```
-
-### 2. Install frontend dependencies
+## Cài đặt và chạy (phát triển)
+1. Cài đặt dependencies cho frontend:
 
 ```bash
 cd client
 npm install
+npm run dev
 ```
 
-### 3. Install backend dependencies
-
-```bash
-cd ../server
-npm install
-```
-
-### 4. Configure environment variables
-
-Create a `.env` file inside `server/` and fill in the values used by the backend controllers and services.
-
-Example:
-
-```env
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-CLIENT_URL=http://localhost:5173
-
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_api_secret
-
-PAYOS_CLIENT_ID=your_payos_client_id
-PAYOS_API_KEY=your_payos_api_key
-PAYOS_CHECKSUM_KEY=your_payos_checksum_key
-
-EMAIL_USER=your_email_account
-EMAIL_PASS=your_email_password
-OPENAI_API_KEY=your_openai_key
-GROQ_API_KEY=your_groq_key
-```
-
-If the frontend needs custom environment values, add a `.env` file in `client/` as well.
-
-### 5. Run the backend
+2. Cài đặt dependencies cho backend và khởi chạy server:
 
 ```bash
 cd server
-npm run dev
+npm install
+# sửa file .env_example thành .env và thay các cấu trúc bên trong thành của bạn
+npm run dev # hoặc npm start tùy cấu hình package.json
 ```
 
-### 6. Run the frontend
+## Biến môi trường mẫu (`server/.env`)
+- `PORT`=3000
+- `MONGO_URI`=<kết nối MongoDB>
+- `JWT_SECRET`=<khóa bí mật cho JWT>
+- `CLIENT_URL`=<địa chỉ frontend, ví dụ http://localhost:5173>
+- `STRIPE_SECRET_KEY`=<nếu dùng Stripe để thanh toán>
+- `STRIPE_WEBHOOK_SECRET`=<nếu dùng Stripe webhook>
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS` (nếu gửi email xác thực / reset)
 
-Open a second terminal:
+Lưu ý: Chỉ thêm những biến bạn thực sự sử dụng trong repo.
+
+## Migrations / Seed
+- Nếu dự án có script migrate, chạy tương tự:
+
+```bash
+cd server
+node migrate.js
+```
+
+## Build cho production
+- Frontend:
 
 ```bash
 cd client
-npm run dev
+npm run build
+# deploy phần build theo hướng dẫn hosting
 ```
 
-## Available Scripts
+- Backend: cấu hình `NODE_ENV=production` và chạy process manager (pm2, docker, etc.)
 
-### Client
+## Kiểm tra và debug
+- Kiểm tra logs backend để biết lỗi kết nối DB hoặc lỗi API.
+- Sử dụng `Postman` / `curl` để test endpoint API.
 
-- `npm run dev` - start Vite development server
-- `npm run build` - build production assets
-- `npm run preview` - preview the production build
-- `npm run lint` - run ESLint
+## Đóng góp
+- Tạo issue hoặc fork repo và gửi pull request.
 
-### Server
+## Liên hệ
+- Thông tin liên hệ:
+ - https://fb.com/tuanthu2911
 
-- `npm run dev` - start backend with Nodemon
-- `npm start` - start backend in production mode
+---
 
-## Notes
-
-- The backend is split into controllers, routes, models, middleware, and utils for easier maintenance.
-- Recipe filtering already supports classification-based behavior such as category and meal type.
-- Check the SQL file and existing backend models before importing data or changing schema-related logic.
-
-## License
-
-No license has been defined yet. Add one if you want to publish the project publicly.
+> Tệp này là bản tóm tắt nhanh. Nếu bạn muốn mình mở rộng thành README chi tiết (mô tả environment cụ thể, scripts từ package.json, hướng dẫn deploy Docker, hoặc hướng dẫn test), nói mình biết yêu cầu cụ thể.

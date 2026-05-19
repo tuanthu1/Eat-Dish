@@ -42,16 +42,24 @@ const RecipeDetailPage = () => {
     const reviewsRef = useRef(null);
     const isAdmin = currentUser?.role === 'admin';
     const isOwner = currentUser && recipe && String(currentUser.id) === String(recipe.author_id || recipe.user_id || recipe.author);
-    const isPremiumUser = currentUser?.is_premium == 1 || currentUser?.is_premium === true;
+    const isPremiumUser = Number(currentUser?.is_premium || 0) > 0 || currentUser?.is_premium === true;
 
     const canViewFullRecipe = isAdmin || isPremiumUser || isOwner;
-    const isRecipeVip = (recipe?.is_premium == 1 || recipe?.is_vip == 1);
+    const isRecipeVip = Number(recipe?.premium_level ?? recipe?.is_premium ?? recipe?.is_vip ?? 0) > 0;
     const isLocked = isRecipeVip && !canViewFullRecipe;
 
     useEffect(() => {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const userStr = localStorage.getItem('user') || localStorage.getItem('eatdish_user_id');
+        const cachedUser = (() => {
+            try {
+                return JSON.parse(localStorage.getItem('user') || 'null');
+            } catch (error) {
+                return null;
+            }
+        })();
+        const cachedUserId = String(cachedUser?.id || cachedUser?._id || localStorage.getItem('eatdish_user_id') || '');
 
-        if (!token) {
+        if (!userStr) {
             toast.warning("Vui lòng đăng nhập để xem chi tiết món ăn!");
             navigate('/login-register');
             return;
@@ -60,17 +68,32 @@ const RecipeDetailPage = () => {
         const fetchRecipeData = async () => {
             setIsLoading(true);
             try {
-                const resAuth = await axiosClient.get('/auth/me');
-                const loggedUser = resAuth.data.user;
-                const currentUserId = String(loggedUser._id || loggedUser.id);
-                loggedUser.id = currentUserId;
-                setCurrentUser(loggedUser);
-                setMyId(currentUserId);
+                if (cachedUserId) {
+                    setMyId(cachedUserId);
+                }
+                if (cachedUser) {
+                    setCurrentUser({ ...cachedUser, id: cachedUserId || cachedUser.id });
+                }
 
-                const [resRec, resFav] = await Promise.all([
-                    axiosClient.get(`/recipes/${id}`),
-                    axiosClient.get(`/recipes/favorites/${currentUserId}`)
+                const authPromise = axiosClient.get('/auth/me').catch(() => null);
+                const recipePromise = axiosClient.get(`/recipes/${id}`);
+                const favoritePromise = cachedUserId
+                    ? axiosClient.get(`/recipes/favorites/${cachedUserId}`).catch(() => ({ data: [] }))
+                    : Promise.resolve({ data: [] });
+
+                const [resAuth, resRec, resFav] = await Promise.all([
+                    authPromise,
+                    recipePromise,
+                    favoritePromise
                 ]);
+
+                if (resAuth?.data?.user) {
+                    const loggedUser = resAuth.data.user;
+                    const currentUserId = String(loggedUser._id || loggedUser.id);
+                    loggedUser.id = currentUserId;
+                    setCurrentUser(loggedUser);
+                    setMyId(currentUserId);
+                }
 
                 setRecipe(resRec.data);
 
@@ -190,33 +213,45 @@ const RecipeDetailPage = () => {
 
     // Hàm Xử Lý
     const safeParseArray = (data) => {
-        if (!data) return [];
+        const result = [];
 
-        let rawData = data;
-        if (Array.isArray(rawData) && rawData.length === 1 && typeof rawData[0] === 'string' && rawData[0].trim().startsWith('[')) {
-            rawData = rawData[0];
-        }
+        const pushNormalized = (value) => {
+            if (value == null) return;
 
-        if (Array.isArray(rawData)) return rawData;
-        if (typeof rawData === 'string') {
-            try {
-                let parsed = JSON.parse(rawData);
-
-                if (typeof parsed === 'string' && parsed.trim().startsWith('[')) {
-                    parsed = JSON.parse(parsed);
-                }
-
-                return Array.isArray(parsed) ? parsed : [parsed];
-            } catch (error) {
-                let text = rawData.trim();
-                if (text.startsWith('[') && text.endsWith(']')) {
-                    let stripped = text.slice(1, -1);
-                    return stripped.split('","').map(item => item.replace(/^["']|["']$/g, '').trim());
-                }
-                return [rawData];
+            if (Array.isArray(value)) {
+                value.forEach(pushNormalized);
+                return;
             }
-        }
-        return [];
+
+            if (typeof value === 'string') {
+                const text = value.trim();
+                if (!text) return;
+
+                if (text.startsWith('[') || text.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(text);
+                        pushNormalized(parsed);
+                        return;
+                    } catch (error) {
+                        // fall through and treat as plain text
+                    }
+                }
+
+                result.push(text);
+                return;
+            }
+
+            if (typeof value === 'object') {
+                const text = value.name || value.description || value.text || value.value || '';
+                if (text) result.push(String(text).trim());
+                return;
+            }
+
+            result.push(String(value).trim());
+        };
+
+        pushNormalized(data);
+        return result.filter(Boolean);
     };
 
     if (isLoading) return <div className="page-loading-msg">Đang load công thức... </div>;

@@ -76,9 +76,6 @@ exports.login = async (req, res) => {
         });
         if (!user) return res.status(404).json({ message: "Sai tên đăng nhập hoặc mật khẩu" });
 
-        if (!user.is_verified) {
-            return res.status(403).json({ message: "Tài khoản chưa xác minh email." });
-        }
         if (user.is_disabled) {
             return res.status(403).json({ message: "Tài khoản bị vô hiệu hóa!" });
         }
@@ -128,8 +125,9 @@ exports.login = async (req, res) => {
             message: "Đăng nhập thành công",
             user: {
                 ...userData,
-                id: user._id, // Cấp sẵn ID chuẩn cho Frontend
+                id: user._id,
                 is_premium: user.is_premium,
+                is_verified: user.is_verified,
                 premium_expired: hasJustExpired 
             }
         });
@@ -180,23 +178,33 @@ exports.googleLogin = async (req, res) => {
             { expiresIn: '1d' }
         );
 
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
         const userData = user.toObject ? user.toObject() : user;
         delete userData.password;
         await ActivityLog.create({
             username: user.username,
             action: "Tài khoản " + user.email + " đã đăng nhập bằng Google."
-            });
-        res.status(200).json({
-            status: 'success',
-            user: userData,
-            token: accessToken
         });
 
+        return res.status(200).json({
+            status: 'success',
+            user: {
+                ...userData,
+                id: user._id
+            }
+        });
     } catch (error) {
         console.error("Lỗi Google Auth:", error.message);
-        res.status(500).json({ message: "Xác thực Google thất bại." });
+        return res.status(500).json({ message: "Xác thực Google thất bại." });
     }
 };
+
 // hàm đổi mật khẩu
 exports.changePassword = async (req, res) => {
     try {
@@ -204,11 +212,11 @@ exports.changePassword = async (req, res) => {
 
         const user = await User.findById(userId);
         if (!user) {
-            return res.status(404).json({ message: "Tài khoản không tồn tại." });
+            return res.status(404).json({ message: "Người dùng không tồn tại!" });
         }
 
-        const isMatch = await bcrypt.compare(oldPassword, user.password);
-        if (!isMatch) {
+        const isPasswordMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isPasswordMatch) {
             return res.status(400).json({ message: "Mật khẩu cũ không chính xác!" });
         }
 
@@ -220,11 +228,11 @@ exports.changePassword = async (req, res) => {
             username: user.username,
             action: "Tài khoản " + user.email + " đã đổi mật khẩu thành công."
         });
-        res.json({ status: 'success', message: "Đổi mật khẩu thành công!" });
 
+        return res.json({ status: 'success', message: "Đổi mật khẩu thành công!" });
     } catch (err) {
         console.error("Lỗi đổi pass:", err);
-        res.status(500).json({ message: "Lỗi Server: " + err.message });
+        return res.status(500).json({ message: "Lỗi Server: " + err.message });
     }
 };
 
@@ -272,6 +280,41 @@ exports.verifyEmail = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+// Gửi lại email xác thực
+exports.resendVerifyEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Cần cung cấp email" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "Email không tồn tại" });
+    }
+
+    if (user.is_verified) {
+      return res.status(400).json({ message: "Tài khoản đã được xác minh rồi" });
+    }
+
+    // Tạo token xác minh mới
+    const verifyToken = crypto.randomBytes(20).toString('hex');
+    await User.findByIdAndUpdate(user._id, { email_verify_token: verifyToken });
+
+    // Gửi email
+    await sendVerifyEmail(user.email, user.fullname, verifyToken);
+
+    return res.json({ message: "Email xác minh đã được gửi lại, vui lòng kiểm tra inbox của bạn" });
+
+  } catch (err) {
+    console.error("RESEND VERIFY EMAIL ERROR:", err);
+    return res.status(500).json({ message: "Không thể gửi email lúc này" });
+  }
+};
+
 // chức năng quên mật khảu
 exports.forgotPassword = async (req, res) => {
     try {
@@ -293,11 +336,8 @@ exports.forgotPassword = async (req, res) => {
             reset_expires: expireTime
         });
 
-        // Link reset 
-        const resetUrl = `${process.env.DOMAIN}/reset-password?token=${token}`;
-
         // Gửi mail
-        await sendResetEmail(email, resetUrl);
+        await sendResetEmail(email, token);
         await ActivityLog.create({
             username: user.username,
             action: "Tài khoản" + user.email + " đã yêu cầu đặt lại mật khẩu."
@@ -345,10 +385,14 @@ exports.resetPassword = async (req, res) => {
 // Trả về thông tin thật sự dựa vào Token
 exports.getMe = async (req, res) => {
     try {
+        if (!req.user?.id) {
+            return res.json({ user: null });
+        }
+
         const user = await User.findById(req.user.id).select('id username fullname avatar role is_premium');
         
         if (!user) {
-            return res.status(404).json({ message: "Không tìm thấy" });
+            return res.json({ user: null });
         }
         
         res.json({ user });

@@ -4,6 +4,7 @@ import axiosClient from '../api/axiosClient';
 import PremiumModal from '../components/modals/PremiumModal';
 import '../index.css';
 import { Bell, Crown, Trophy, Flame, Heart } from 'lucide-react';
+import PremiumIcon from './PremiumIcon';
 const RightSidebar = ({ user, unreadCount, notifications, showNotifDropdown, handleToggleNotifications, handleLogout, onOpenPremium }) => {
     const navigate = useNavigate();
     const [topChefs, setTopChefs] = useState([]);
@@ -63,12 +64,25 @@ const RightSidebar = ({ user, unreadCount, notifications, showNotifDropdown, han
         navigate(`/recipe/${recipeId}`);
     };
 
+    const handleMarkAsRead = async (notificationId) => {
+        try {
+            await axiosClient.post('/notifications/mark-as-read', {
+                userId: user?.id,
+                notificationId
+            });
+            // Optional: Refresh notifications từ parent component
+            // hoặc update local state nếu cần
+        } catch (err) {
+            console.log('Lỗi đánh dấu đã đọc:', err);
+        }
+    };
+
     return (
         <aside className={`sidebar-right-panel ${isPremiumModalOpen ? 'z-max' : ''}`}>
             <div className="user-panel-header">
                 {!isGuest && (
                     <div onClick={onOpenPremium} className="mobile-header-premium">
-                        <Crown color='#ff9f1c'/> VIP
+                        <PremiumIcon size={14} /> <span style={{ marginLeft: 6, fontWeight: 700 }}>VIP</span>
                     </div>
                 )}
                 <div className="rs-notif-wrapper" ref={notifRef}>
@@ -88,7 +102,12 @@ const RightSidebar = ({ user, unreadCount, notifications, showNotifDropdown, han
                             <div className="rs-notif-header">Thông báo mới</div>
                             <div className="rs-notif-list">
                                 {notifications.length > 0 ? notifications.map(n => (
-                                    <div key={n.id} className={`rs-notif-item ${n.is_read ? 'read' : 'unread'}`}>
+                                    <div 
+                                        key={n.id} 
+                                        className={`rs-notif-item ${n.is_read ? 'read' : 'unread'}`}
+                                        onClick={() => handleMarkAsRead(n.id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         {n.message}
                                         <div className="rs-notif-date">{new Date(n.created_at).toLocaleDateString()}</div>
                                     </div>
@@ -106,9 +125,13 @@ const RightSidebar = ({ user, unreadCount, notifications, showNotifDropdown, han
                         <img src={user.avatar} className={`rs-avatar-img ${user.is_premium === 1 ? 'premium' : ''}`} alt="Avatar" />
                     </div>
                     
-                    <span className="rs-user-name" >
-                        {user.fullname}
-                        {(user.is_premium == 1 || user.is_premium === true) && <span title="Thành viên VIP" ><Crown  size={18} color='#ff9f1c'/></span>}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span className="rs-user-name" style={{ minWidth: 0 }}>{user.fullname}</span>
+                        {(user.is_premium == 1 || user.is_premium === true) && (
+                            <span title="Thành viên VIP" style={{ flexShrink: 0 }}>
+                                <PremiumIcon size={16} />
+                            </span>
+                        )}
                     </span>
                 </div>
 
@@ -133,7 +156,7 @@ const RightSidebar = ({ user, unreadCount, notifications, showNotifDropdown, han
 
                     {user && user.is_premium !== 1 && (
                         <div onClick={() => setIsPremiumModalOpen(true)} className="rs-floating-premium-btn">
-                            <span><Crown color='#ff9f1c'/></span> 
+                            <PremiumIcon size={18} />
                         </div>
                     )}
 

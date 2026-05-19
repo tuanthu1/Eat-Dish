@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { Dices } from 'lucide-react';
+import Modal from '../Modal';
+import '../../index.css';
 const AdminCouponModal = ({ isOpen, onClose, onSubmit, initialData, isEditMode }) => {
-    const [formData, setFormData] = useState({ code: '', percent: 10, expiry_date: '' });
+    const [formData, setFormData] = useState({ code: '', percent: 10, expiry_date: '', usage_limit: '' });
 
     const today = new Date().toISOString().split('T')[0];
     useEffect(() => {
@@ -11,7 +13,8 @@ const AdminCouponModal = ({ isOpen, onClose, onSubmit, initialData, isEditMode }
                 setFormData({
                     code: initialData.code || '',
                     percent: initialData.percent || 10,
-                    expiry_date: initialData.expiry_date ? initialData.expiry_date.split('T')[0] : ''
+                    expiry_date: initialData.expiry_date ? initialData.expiry_date.split('T')[0] : '',
+                    usage_limit: initialData.usage_limit != null ? String(initialData.usage_limit) : ''
                 });
             } else {
                 setFormData({ code: '', percent: 10, expiry_date: '' });
@@ -34,7 +37,15 @@ const AdminCouponModal = ({ isOpen, onClose, onSubmit, initialData, isEditMode }
         if (formData.expiry_date && formData.expiry_date < today) return toast.error("❌ Ngày hết hạn không được nhỏ hơn ngày hiện tại!");
         if (formData.percent < 1 || formData.percent > 100) return toast.error("❌ Phần trăm giảm giá phải từ 1% đến 100%");
         if (!formData.code.trim()) { generateRandomCode(); return toast.error("⚠️ Vui lòng nhập mã hoặc bấm nút Random"); }
-        onSubmit(formData);
+        // normalize usage_limit: empty => null, otherwise integer >=1
+        const out = { ...formData };
+        if (out.usage_limit === '' || out.usage_limit == null) out.usage_limit = null;
+        else {
+            const n = parseInt(out.usage_limit, 10);
+            if (isNaN(n) || n < 1) return toast.error(' Usage limit phải là số nguyên dương hoặc để trống');
+            out.usage_limit = n;
+        }
+        onSubmit(out);
     };
 
     if (!isOpen) return null;
@@ -53,7 +64,7 @@ const AdminCouponModal = ({ isOpen, onClose, onSubmit, initialData, isEditMode }
                                 className="admin-form-input admin-flex-1" 
                                 value={formData.code} 
                                 onChange={e => { setFormData({ ...formData, code: e.target.value.toUpperCase() });}} 
-                                placeholder="VD: TET" disabled={isEditMode} 
+                                placeholder="VD: GIAMGIA100" disabled={isEditMode} 
                                 style={{ background: isEditMode ? '#eee' : '#fff' }}
                             />
                             {!isEditMode && (
@@ -72,7 +83,12 @@ const AdminCouponModal = ({ isOpen, onClose, onSubmit, initialData, isEditMode }
                         <input className="admin-form-input" type="date" min={today} value={formData.expiry_date} onChange={e => { setFormData({ ...formData, expiry_date: e.target.value }); }} required />
                     </div>
 
-                    <button type="submit" className="btn-primary-admin w-100 justify-center">
+                    <div className="admin-form-group">
+                        <label className="admin-form-label">Giới hạn sử dụng (số lần, để trống = không giới hạn)</label>
+                        <input className="admin-form-input" type="number" min="1" value={formData.usage_limit} onChange={e => setFormData({ ...formData, usage_limit: e.target.value })} placeholder="Ví dụ: 100" />
+                    </div>
+
+                    <button type="submit" className="btn-primary-admin w-100 justify-center mt-2">
                         {isEditMode ? "Lưu Thay Đổi" : "Tạo Mã Ngay"}
                     </button>
                 </form>

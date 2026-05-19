@@ -237,3 +237,70 @@ exports.updateRecipeClassifications = async (req, res) => {
         res.status(500).json({ message: 'Lỗi Server khi cập nhật phân loại món ăn' });
     }
 };
+
+// AI Chatbot settings
+exports.getAiChatbot = async (req, res) => {
+    try {
+        const setting = await SiteSetting.findOne({ key: 'ai_chatbot' });
+        const value = setting?.value || {};
+
+        const payload = {
+            enabled: !!value.enabled,
+            provider: value.provider || 'openai',
+            welcome_message: value.welcome_message || '',
+            system_prompt: value.system_prompt || '',
+            openai_apikey: value.openai_apikey || '',
+            groq_apikey: value.groq_apikey || '',
+            claude_apikey: value.claude_apikey || '',
+            gemini_apikey: value.gemini_apikey || '',
+               mimo_apikey: value.mimo_apikey || '',
+            other_apikey: value.other_apikey || ''
+        };
+
+        res.json(payload);
+    } catch (err) {
+        console.error('Lỗi lấy cấu hình AI chatbot:', err);
+        res.status(500).json({ message: 'Lỗi Server' });
+    }
+};
+
+exports.updateAiChatbot = async (req, res) => {
+    try {
+        const {
+            enabled,
+            provider,
+            welcome_message,
+            system_prompt,
+            openai_apikey,
+            groq_apikey,
+            claude_apikey,
+            gemini_apikey,
+            mimo_apikey,
+            other_apikey
+        } = req.body;
+
+        const value = {
+            enabled: !!enabled,
+            provider: provider || 'openai',
+            welcome_message: String(welcome_message || '').trim(),
+            system_prompt: String(system_prompt || '').trim(),
+            openai_apikey: String(openai_apikey || '').trim() || null,
+            groq_apikey: String(groq_apikey || '').trim() || null,
+            claude_apikey: String(claude_apikey || '').trim() || null,
+            gemini_apikey: String(gemini_apikey || '').trim() || null,
+            mimo_apikey: String(mimo_apikey || '').trim() || null,
+            other_apikey: String(other_apikey || '').trim() || null
+        };
+
+        const updated = await SiteSetting.findOneAndUpdate(
+            { key: 'ai_chatbot' },
+            { value },
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        res.json({ success: true, message: 'Cập nhật cấu hình AI chatbot thành công', config: value });
+    } catch (err) {
+        console.error('Lỗi cập nhật cấu hình AI chatbot:', err);
+        res.status(500).json({ message: 'Lỗi Server' });
+    }
+};

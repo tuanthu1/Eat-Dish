@@ -304,7 +304,7 @@ const UploadModal = ({
                                 <button onClick={handleAddStep} className="up-btn-add dark">+</button>
                             </div>
                         </div>
-                        {user?.is_premium === 1 && (
+                        {(user?.role === 'admin') && (
                             <div style={{ 
                                 margin: '15px 0', 
                                 padding: '10px', 
@@ -312,14 +312,18 @@ const UploadModal = ({
                                 borderRadius: '8px',
                                 border: '1px dashed #ff9f1c'
                             }}>
-                                <label style={{ cursor: 'pointer', fontWeight: 'bold', color: '#d35400', display: 'flex', alignItems: 'center' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={uploadData.is_premium === 1}
-                                        onChange={(e) => setUploadData({...uploadData, is_premium: e.target.checked ? 1 : 0})}
-                                        style={{ marginRight: '10px', transform: 'scale(1.3)' }}
-                                    />
-                                    <Crown /> Đăng làm công thức Premium (Không hiện quảng cáo)
+                                <label style={{ cursor: 'pointer', fontWeight: 'bold', color: '#d35400', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                    <Crown /> Mức Premium
+                                    <select
+                                        value={uploadData.is_premium ?? 0}
+                                        onChange={(e) => setUploadData({ ...uploadData, is_premium: Number(e.target.value) })}
+                                        style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #ff9f1c', background: '#fff', fontWeight: 700 }}
+                                    >
+                                        <option value={0}>0 - Free</option>
+                                        <option value={1}>1 - Cao nhất</option>
+                                        <option value={2}>2 - Trung bình</option>
+                                        <option value={3}>3 - Thấp</option>
+                                    </select>
                                 </label>
                             </div>
                         )}

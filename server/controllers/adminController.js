@@ -12,6 +12,36 @@ const UserReport = require('../models/UserReportModel');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+const applyPremiumFromPayment = async (paymentDoc) => {
+    if (!paymentDoc || !paymentDoc.user) return;
+
+    const user = await User.findById(paymentDoc.user);
+    if (!user) return;
+
+    let startDate = new Date();
+    if (user.premium_until) {
+        const currentUntil = new Date(user.premium_until);
+        if (currentUntil > new Date()) {
+            startDate = new Date(user.premium_until);
+        }
+    }
+
+    let durationDays = 30;
+    if (paymentDoc.package) {
+        const pkg = await PremiumPackage.findById(paymentDoc.package);
+        if (pkg) durationDays = pkg.duration_days || durationDays;
+    }
+
+    const premiumUntil = new Date(startDate);
+    premiumUntil.setDate(premiumUntil.getDate() + durationDays);
+
+    await User.findByIdAndUpdate(paymentDoc.user, {
+        is_premium: true,
+        premium_since: user.premium_since || new Date(),
+        premium_until: premiumUntil
+    });
+};
+
 //  Lấy thống kê tổng quan
 exports.getStats = async (req, res) => {
     try {
@@ -62,10 +92,13 @@ exports.deleteUser = async (req, res) => {
 // Lấy danh sách tất cả góp ý
 exports.getAllFeedbacks = async (req, res) => {
     try {
-        const feedbacks = await Feedback.find().populate('user', 'fullname username');
+        const feedbacks = await Feedback.find().populate('user', 'fullname username email').sort({ createdAt: -1 });
         const formattedFeedbacks = feedbacks.map(f => {
             const fObj = f.toObject();
-            fObj.id = fObj._id; // Gắn phao cứu sinh cho React
+            fObj.id = fObj._id;
+            fObj.username = fObj.user?.username;
+            fObj.email = fObj.user?.email;
+            fObj.fullname = fObj.user?.fullname;
             return fObj;
         });
         res.json(formattedFeedbacks);
@@ -226,23 +259,18 @@ exports.importRecipes = async (req, res) => {
                     steps: Array.isArray(recipe.steps) ? recipe.steps : [],
                     img: recipe.img || '',
                     image_url: recipe.img || '',
+                    video_url: recipe.video_url || '',
                     category: recipe.category || 'Khac',
                     meal_type: recipe.meal_type || 'Khong_xac_dinh',
-                    author_id: userId,
-                    user_id: userId,
-                    author_name: user.username,
-                    username: user.username,
-                    fullname: user.fullname,
-                    created_at: new Date(),
-                    createdAt: new Date()
+                    author: userId,
+                    is_premium: !!recipe.is_premium
                 });
 
-                // Log activity
+                // Log activity — set `admin` (ObjectId) so populate('admin') can resolve fullname
                 await ActivityLog.create({
-                    user_id: userId,
-                    action: 'import_recipe',
-                    details: `Imported recipe: ${recipe.name}`,
-                    timestamp: new Date()
+                    admin: userId,
+                    username: user.fullname,
+                    action: `nhập công thức mới từ file Excel: ${recipe.name}`
                 });
 
                 createdRecipes.push(newRecipe);
@@ -400,6 +428,77 @@ exports.getAllPayments = async (req, res) => {
         res.status(500).json({ message: "Lỗi Server" });
     }
 };
+
+exports.updatePaymentStatus = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { status } = req.body;
+
+        if (!orderId) {
+            return res.status(400).json({ message: 'Thiếu mã giao dịch' });
+        }
+
+        const normalizedInput = String(status || '').toLowerCase();
+        const normalizedStatus = normalizedInput === 'paid' || normalizedInput === 'success'
+            ? 'success'
+            : normalizedInput === 'failed'
+                ? 'failed'
+                : null;
+
+        if (!normalizedStatus) {
+            return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
+        }
+
+        const payment = await Payment.findOne({ order_id: orderId });
+        if (!payment) {
+            return res.status(404).json({ message: 'Không tìm thấy giao dịch' });
+        }
+
+        await Payment.findOneAndUpdate(
+            { order_id: orderId },
+            { status: normalizedStatus },
+            { returnDocument: 'after' }
+        );
+
+        if (normalizedStatus === 'success') {
+            try {
+                await applyPremiumFromPayment(payment);
+            } catch (premiumError) {
+                console.error('Lỗi cộng Premium từ giao dịch:', premiumError);
+            }
+        }
+
+        // Send notification to user about payment status
+        try {
+            const Notification = require('../models/Notification');
+            if (normalizedStatus === 'success' && payment && payment.user) {
+                await Notification.create({
+                    user: payment.user,
+                    message: `Giao dịch ${orderId} đã được xác nhận. Premium đã được cấp.`,
+                    type: 'payment'
+                });
+            } else if (normalizedStatus === 'failed' && payment && payment.user) {
+                await Notification.create({
+                    user: payment.user,
+                    message: `Giao dịch ${orderId} không thành công. Vui lòng thử lại.`,
+                    type: 'payment'
+                });
+            }
+        } catch (notifErr) {
+            console.error('Lỗi tạo notification cho payment:', notifErr);
+        }
+
+        await ActivityLog.create({
+            admin: req.user ? req.user.id : null,
+            action: `Admin đã ${normalizedStatus === 'success' ? 'xác nhận' : 'từ chối'} giao dịch ${orderId}`
+        });
+
+        return res.json({ success: true, message: 'Cập nhật trạng thái thanh toán thành công' });
+    } catch (error) {
+        console.error('Lỗi cập nhật trạng thái thanh toán:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
 // reset mật khẩu
 exports.resetPass = async (req, res) => {
     const userId = req.params.id;
@@ -430,28 +529,30 @@ exports.createPackage = async (req, res) => {
         let benefitsArray = [];
         if (typeof benefits === 'string') {
             try {
-                benefitsArray = JSON.parse(benefits); 
+                benefitsArray = JSON.parse(benefits);
             } catch (e) {
-                benefitsArray = benefits.split(',').map(b => b.trim());
+                benefitsArray = benefits.split(',').map(b => b.trim()).filter(Boolean);
             }
         } else if (Array.isArray(benefits)) {
             benefitsArray = benefits;
         }
+
         const newPackage = await PremiumPackage.create({
-            name: name,
-            price: price,
+            name,
+            price,
             duration_days: finalDuration,
-            description: description,
             benefits: benefitsArray,
+            description,
             is_active: true
         });
+
         const packageData = newPackage.toObject();
         packageData.id = packageData._id;
 
-        res.json({ 
-            status: 'success', 
-            message: "Tạo gói VIP thành công!", 
-            package: packageData 
+        res.json({
+            status: 'success',
+            message: 'Tạo gói VIP thành công!',
+            package: packageData
         });
 
     } catch (err) {
@@ -511,22 +612,14 @@ exports.getAllCoupons = async (req, res) => {
     try {
         const coupons = await DiscountCode.find({}).sort({ createdAt: -1 });
         
-        // Đếm số lượt dùng từ bảng Payment và map _id thành id cho React
-        const couponsWithUsage = await Promise.all(
-            coupons.map(async (coupon) => {
-                const usedCount = await Payment.countDocuments({
-                    coupon_code: coupon.code,
-                    status: 'paid'
-                });
-                
-                const obj = coupon.toObject();
-                return {
-                    ...obj,
-                    id: obj._id,             // Chữa lỗi unique key và undefined ở Frontend
-                    used_count: usedCount    // Cập nhật số lượt dùng thực tế
-                };
-            })
-        );
+        // Dùng trực tiếp used_count từ DiscountCode vì lượt dùng được tính ngay lúc ấn "Áp dụng".
+        const couponsWithUsage = coupons.map((coupon) => {
+            const obj = coupon.toObject();
+            return {
+                ...obj,
+                id: obj._id
+            };
+        });
         
         res.json(couponsWithUsage);
     } catch (err) {
@@ -539,7 +632,7 @@ exports.getAllCoupons = async (req, res) => {
 // Tạo mã giảm giá (Đã fix lỗi thông báo trống trơn cho React)
 exports.createCoupon = async (req, res) => {
     try {
-        let { code, percent, expiry_date } = req.body;
+        let { code, percent, expiry_date, usage_limit } = req.body;
 
         // Trả về CẢ 'message' VÀ 'error' để Frontend kiểu gì cũng đọc được
         if (percent === undefined || percent === null || isNaN(Number(percent))) {
@@ -561,7 +654,8 @@ exports.createCoupon = async (req, res) => {
             code: code.toUpperCase(),
             percent: numericPercent,
             expiry_date: expiry_date || null,
-            is_active: true
+            is_active: true,
+            usage_limit: usage_limit ? Number(usage_limit) : null
         });
 
         const couponData = newCoupon.toObject();
@@ -588,7 +682,7 @@ exports.updateCoupon = async (req, res) => {
             return res.status(400).json({ message: "Lỗi ID: Vui lòng tải lại trang (F5)!", error: "Lỗi ID: Vui lòng tải lại trang (F5)!" });
         }
 
-        const { code, percent, expiry_date } = req.body;
+        const { code, percent, expiry_date, usage_limit } = req.body;
         
         if (!code) {
             return res.status(400).json({ message: "Thiếu thông tin mã code", error: "Thiếu thông tin mã code" });
@@ -604,7 +698,8 @@ exports.updateCoupon = async (req, res) => {
         await DiscountCode.findByIdAndUpdate(id, {
             code,
             percent: Number(percent),
-            expiry_date: expiry_date || null
+            expiry_date: expiry_date || null,
+            usage_limit: usage_limit !== undefined ? (usage_limit === null ? null : Number(usage_limit)) : undefined
         }, { returnDocument: 'after' });
 
         res.json({ message: "Cập nhật mã giảm giá thành công!" });
@@ -739,7 +834,7 @@ exports.updateRecipeClassification = async (req, res) => {
             meal_type: meal_type ? String(meal_type).trim() : 'Khong_xac_dinh'
         };
 
-        const updatedRecipe = await Recipe.findByIdAndUpdate(id, updatePayload, { new: true })
+        const updatedRecipe = await Recipe.findByIdAndUpdate(id, updatePayload, { returnDocument: 'after' })
             .populate({ path: 'author', select: 'fullname username _id' });
 
         if (!updatedRecipe) {
@@ -787,7 +882,21 @@ exports.updateUserReportStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
         
-        const updatedReport = await UserReport.findByIdAndUpdate(id, { status }, { new: true });
+        const updatedReport = await UserReport.findByIdAndUpdate(id, { status }, { returnDocument: 'after' });
+
+        if (status === 'resolved' && updatedReport && updatedReport.reporter) {
+            try {
+                const Notification = require('../models/Notification');
+                await Notification.create({
+                    user: updatedReport.reporter,
+                    message: `Báo cáo của bạn đối với người dùng đã được admin xác nhận và xử lý. Cảm ơn bạn đã đóng góp!`,
+                    type: 'system'
+                });
+            } catch (notifErr) {
+                console.error('Lỗi tạo thông báo:', notifErr);
+            }
+        }
+
         res.json({ message: "Cập nhật trạng thái báo cáo thành công", report: updatedReport });
     } catch (err) {
         console.error("Lỗi cập nhật báo cáo:", err);
@@ -840,7 +949,21 @@ exports.updateRecipeReportStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
         
-        const updatedReport = await RecipeReport.findByIdAndUpdate(id, { status }, { new: true });
+        const updatedReport = await RecipeReport.findByIdAndUpdate(id, { status }, { returnDocument: 'after' });
+
+        if (status === 'resolved' && updatedReport && updatedReport.reporter) {
+            try {
+                const Notification = require('../models/Notification');
+                await Notification.create({
+                    user: updatedReport.reporter,
+                    message: `Báo cáo của bạn đối với công thức đã được admin xác nhận và xử lý. Cảm ơn bạn đã đóng góp!`,
+                    type: 'system'
+                });
+            } catch (notifErr) {
+                console.error('Lỗi tạo thông báo:', notifErr);
+            }
+        }
+
         res.json({ message: "Cập nhật trạng thái báo cáo thành công", report: updatedReport });
     } catch (err) {
         console.error("Lỗi cập nhật báo cáo công thức:", err);

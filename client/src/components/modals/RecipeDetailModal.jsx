@@ -49,9 +49,9 @@ const RecipeDetailModal = ({ isOpen, onClose, selectedRecipe }) => {
 
     const isAdmin = currentUser?.is_admin === true;
     const isOwner = currentUser && selectedRecipe && currentUser.id == selectedRecipe.author_id;
-    const isPremiumUser = currentUser?.is_premium === 1;
+    const isPremiumUser = Number(currentUser?.is_premium || 0) > 0;
     const canViewFullRecipe = isAdmin || isPremiumUser || isOwner;
-    const isLocked = (selectedRecipe.is_premium == 1 || selectedRecipe.is_vip == 1) && !canViewFullRecipe;
+    const isLocked = Number(selectedRecipe.premium_level ?? selectedRecipe.is_premium ?? selectedRecipe.is_vip ?? 0) > 0 && !canViewFullRecipe;
 
     if (!currentUser && isLocked) return null;
 

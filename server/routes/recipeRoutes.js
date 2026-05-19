@@ -16,6 +16,7 @@ router.get('/:id', recipeController.getRecipeById);
 router.post('/reviews', recipeController.addReview);
 router.post('/calculate-calories', recipeController.calculateCaloriesAI);
 router.get('/:recipeId/reviews', recipeController.getRecipeReviews);
+router.delete('/reviews/:reviewId', verifyToken, recipeController.deleteReview);
 router.get('/favorites/:userId', recipeController.getUserFavorites);
 router.post('/favorites/toggle', recipeController.toggleFavorite);
 router.get('/cooked-history/:userId', recipeController.getCookedHistory);

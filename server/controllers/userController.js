@@ -251,7 +251,7 @@ exports.getTopChefs = async (req, res) => {
         res.status(500).json({ message: "Lỗi Server", error: err.message });
     }
 };
-
+// lấy danh sách người dùng đã bị chặn bởi người dùng hiện tại
 exports.getBlockedUsers = async (req, res) => {
     try {
         const { userId } = req.query;
@@ -265,7 +265,8 @@ exports.getBlockedUsers = async (req, res) => {
         res.status(500).json({ message: "Lỗi server" });
     }
 };
-
+// hàm lấy danh sách ID người dùng đã bị chặn bởi người dùng hiện tại 
+// (dùng cho tính năng lọc khi xem profile, công thức, bình luận...)
 exports.getMutualBlockIds = async (req, res) => {
     try {
         const { userId } = req.query;
@@ -376,7 +377,15 @@ exports.reportUser = async (req, res) => {
             reportedUser: reportedUserId,
             reason: reason
         });
-
+        await ActivityLog.create({
+            admin: reporterId,
+            action: "Tài khoản " + reporterId + " đã báo cáo người dùng ID: " + reportedUserId + " với lý do: " + reason
+        });
+        await Notification.create({
+            user: reporterId,
+            type: 'user_report',
+            message: `Cảm ơn bạn đã báo cáo người dùng. Chúng tôi sẽ xem xét và phản hồi sớm nhất có thể.`
+        });
         res.json({ message: "Báo cáo thành công, quản trị viên sẽ xem xét" });
     } catch (err) {
         console.error("Lỗi báo cáo user:", err);

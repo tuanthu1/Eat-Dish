@@ -7,7 +7,8 @@ import ConfirmModal from '../components/modals/ConfirmModal';
 import Modal from '../components/Modal';
 import EditRecipeModal from '../components/modals/EditRecipeModal';
 import { toast } from 'react-toastify';
-import { ShieldMinus, UserLock, MapPin, Crown, CircleCheck, MessageSquareWarning } from 'lucide-react';
+import { ShieldMinus, UserLock, MapPin, CircleCheck, MessageSquareWarning } from 'lucide-react';
+import PremiumIcon from '../components/PremiumIcon';
 import '../index.css';
 
 const ProfilePage = () => {
@@ -322,7 +323,7 @@ const ProfilePage = () => {
                         <div className="eatdish-name-box">
                             <h2 className="eatdish-fullname">
                                 {profileUser.fullname}
-                                {(profileUser.is_premium == 1 || profileUser.is_premium === true) && <span title="Thành viên VIP" style={{ marginLeft: '5px', fontSize: '18px' }}><Crown size={27} color='#ff9f1c' /></span>}
+                                {(profileUser.is_premium == 1 || profileUser.is_premium === true) && <span title="Thành viên VIP" style={{ marginLeft: '8px', display: 'inline-flex', alignItems: 'center' }}><PremiumIcon size={22} /></span>}
                             </h2>
                             <p className="eatdish-username">@{profileUser.username}</p>
                             {profileUser.location && <p className="eatdish-location"><MapPin /> {profileUser.location}</p>}

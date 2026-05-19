@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../index.css';
 import { Flame, Clock, Heart, MoreVertical, MessageSquareWarning } from 'lucide-react';
+import PremiumIcon from './PremiumIcon';
 import Modal from './Modal';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
@@ -20,10 +21,18 @@ const formatClassification = (value, fallback) => {
     return String(value).replace(/_/g, ' ');
 };
 
+const getPremiumLevel = (recipe) => {
+    const rawLevel = recipe?.premium_level ?? recipe?.is_premium ?? recipe?.is_vip ?? 0;
+    if (rawLevel === true || rawLevel === 'true') return 1;
+    const parsed = Number.parseInt(String(rawLevel), 10);
+    return Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
+};
+
 const RecipeCard = ({ item, isFavorite, onToggleFavorite, onOpenModal, onViewProfile }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [reportReason, setReportReason] = useState('');
+    const [localPremiumLevel, setLocalPremiumLevel] = useState(() => getPremiumLevel(item));
 
     const displayTitle = item.name || item.title || 'Món ăn ngon';
     const displayImg = getFullImageUrl(item.img || item.image || item.image_url);
@@ -34,10 +43,33 @@ const RecipeCard = ({ item, isFavorite, onToggleFavorite, onOpenModal, onViewPro
     displayAvatar = displayAvatar ? getFullImageUrl(displayAvatar) : `https://ui-avatars.com/api/?name=${displayAuthorName}&background=random`;
 
     const targetId = item._id || item.id;
-    const authorId = item.author?._id || item.user_id || item.author_id;
+    // authorId already declared above as `const authorId = item.author?._id || item.user_id || item.author_id;`
     const categoryLabel = item.category_label || formatClassification(item.category, 'Khác');
     const mealTypeLabel = item.meal_type_label || formatClassification(item.meal_type, 'Không xác định');
     
+    const currentUserStr = localStorage.getItem('user') || localStorage.getItem('eatdish_user_id');
+    let currentUser = null;
+    try { currentUser = currentUserStr ? JSON.parse(currentUserStr) : null; } catch(e) { currentUser = null; }
+
+    const authorId = item.author?._id || item.user_id || item.author_id;
+
+    const togglePremium = async (e) => {
+        if (e) e.stopPropagation();
+        if (!authorId) return toast.error('Không xác định tác giả');
+        if (!currentUser || (String(currentUser.id) !== String(authorId) && currentUser.role !== 'admin')) {
+            return toast.error('Chỉ tác giả hoặc admin mới có thể thay đổi trạng thái Premium');
+        }
+        const newVal = localPremiumLevel > 0 ? 0 : 1;
+        try {
+            await axiosClient.put(`/recipes/premium/${item._id || item.id}`, { is_premium: newVal });
+            setLocalPremiumLevel(newVal);
+            toast.success(newVal > 0 ? 'Đã đặt Premium cho công thức' : 'Đã gỡ Premium');
+        } catch (err) {
+            console.error('Lỗi toggle premium:', err);
+            toast.error('Không thể thay đổi trạng thái Premium');
+        }
+    };
+
     return (
         <div className="recipe-card-wrapper">
             <div className="recipe-card-fav-btn" onClick={(e) => { e.stopPropagation(); onToggleFavorite(targetId, e); }}>
@@ -53,10 +85,11 @@ const RecipeCard = ({ item, isFavorite, onToggleFavorite, onOpenModal, onViewPro
                 <div className="recipe-card-body">
                     <div className="recipe-card-author-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onViewProfile(authorId); }}>
-                            <img src={displayAvatar} alt="author" className="recipe-card-author-avt" style={{ margin: 0 }} />
-                            <span className="author-name-text">
+                            <img src={displayAvatar} alt="author" className={`recipe-card-author-avt ${item.author_is_premium ? 'premium-avatar' : ''}`} style={{ margin: 0 }} />
+                            <span className={`author-name-text ${item.author_is_premium ? 'premium-text' : ''}`}>
                                 {displayAuthorName}
                             </span>
+                            {item.author_is_premium && <span title="Thành viên VIP" style={{ display: 'inline-flex', alignItems: 'center' }}><PremiumIcon size={16} /></span>}
                         </div>
 
                         {/* Dấu 3 chấm */}
@@ -70,18 +103,29 @@ const RecipeCard = ({ item, isFavorite, onToggleFavorite, onOpenModal, onViewPro
                             </button>
                             {isMenuOpen && (
                                 <div className="dropdown-menu-container" >
-                                    <button 
-                                        onClick={(e) => { 
-                                            e.stopPropagation(); 
-                                            setIsMenuOpen(false);
-                                            setIsReportModalOpen(true);
-                                        }}
-                                        className="dropdown-item report-btn"
-                                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fff0f0'}
-                                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                    >
-                                        <MessageSquareWarning size={16} /> Báo cáo món
-                                    </button>
+                                            {((currentUser && String(currentUser.id) === String(authorId)) || (currentUser && currentUser.role === 'admin')) && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setIsMenuOpen(false); togglePremium(e); }}
+                                                    className="dropdown-item"
+                                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fffaf0'}
+                                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                >
+                                                    {localIsPremium ? 'Hủy Premium' : 'Đặt Premium'}
+                                                </button>
+                                            )}
+
+                                            <button 
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    setIsMenuOpen(false);
+                                                    setIsReportModalOpen(true);
+                                                }}
+                                                className="dropdown-item report-btn"
+                                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fff0f0'}
+                                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                            >
+                                                <MessageSquareWarning size={16} /> Báo cáo món
+                                            </button>
                                 </div>
                             )}
                         </div>
@@ -116,7 +160,7 @@ const RecipeCard = ({ item, isFavorite, onToggleFavorite, onOpenModal, onViewPro
                             e.currentTarget.src = DEFAULT_RECIPE_IMAGE;
                         }}
                     />
-                    {(item.is_premium === 1 || item.is_vip === 1) && <div className="recipe-card-premium-badge">👑 PREMIUM</div>}
+                    {getPremiumLevel(item) > 0 && <div className="recipe-card-premium-badge">👑 PREMIUM {getPremiumLevel(item)}</div>}
                 </div>
             </div>
 
@@ -133,8 +177,8 @@ const RecipeCard = ({ item, isFavorite, onToggleFavorite, onOpenModal, onViewPro
                     <div className="modal-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                         <button className="btn-confirm-no" onClick={() => setIsReportModalOpen(false)}>Hủy</button>
                         <button className="btn-confirm-yes"  onClick={async () => {
-                            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                            if (!token) return toast.error("Vui lòng đăng nhập để báo cáo!");
+                            const userStr = localStorage.getItem('user') || localStorage.getItem('eatdish_user_id');
+                            if (!userStr) return toast.error("Vui lòng đăng nhập để báo cáo!");
                             if (!reportReason.trim()) return toast.warning("Vui lòng nhập lý do báo cáo!");
 
                             try {

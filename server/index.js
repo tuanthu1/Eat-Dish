@@ -25,6 +25,7 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const packageRoutes = require('./routes/premiumRouter');
 const settingRoutes = require('./routes/settingRouter');
 const adminChatRoutes = require('./routes/adminChatRoutes');
+const chatHistoryRoutes = require('./routes/chatHistoryRoutes');
 // Middleware
 app.use(cors({
     origin: [
@@ -51,11 +52,12 @@ app.use('/api/community', communityRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api', packageRoutes);
+app.use('/api/premium', packageRoutes);
 app.use('/api/payment', paymentRouter);
 app.use('/api/webhook', webhookRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/admin/chat', adminChatRoutes);
+app.use('/api/chat-history', chatHistoryRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error("❌ Lỗi Server:", err);

@@ -18,6 +18,9 @@ const AuthPage = () => {
         password: ''
     });
     const [resetEmail, setResetEmail] = useState('');
+    const [unverifiedEmail, setUnverifiedEmail] = useState('');
+    const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+    const [isResendingVerification, setIsResendingVerification] = useState(false);
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -35,8 +38,7 @@ const AuthPage = () => {
             if (res.data.status === 'success') {
                 const user = res.data.user;
                 localStorage.setItem('user', JSON.stringify(user));
-                localStorage.setItem('token', res.data.token);
-                localStorage.setItem('eatdish_user_id', user.id);
+                localStorage.setItem('eatdish_user_id', String(user.id || user._id || ''));
                 localStorage.setItem('eatdish_user_role', user.role || 'user');
 
                 if (user.role === 'admin') window.location.href = '/admin';
@@ -121,10 +123,15 @@ const AuthPage = () => {
             if (res.data.status === 'success') {
                 const user = res.data.user;
                 localStorage.setItem('user', JSON.stringify(user));
-                localStorage.setItem('token', res.data.token);
-                if (res.data.refreshToken) localStorage.setItem('refresh_token', res.data.refreshToken);
-                localStorage.setItem('eatdish_user_id', user.id);
+                localStorage.setItem('eatdish_user_id', String(user.id || user._id || ''));
                 localStorage.setItem('eatdish_user_role', user.role);
+
+                // Kiểm tra xem email đã xác minh chưa
+                if (!user.is_verified) {
+                    setUnverifiedEmail(user.email);
+                    setIsVerificationModalOpen(true);
+                    return;
+                }
 
                 if (user.role === 'admin') window.location.href = '/admin';
                 else {
@@ -146,6 +153,20 @@ const AuthPage = () => {
             }
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleResendVerification = async () => {
+        if (!unverifiedEmail) return;
+        
+        setIsResendingVerification(true);
+        try {
+            const res = await axiosClient.post('/auth/resend-verify-email', { email: unverifiedEmail });
+            toast.success(res.data.message);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Không thể gửi email lúc này. Vui lòng thử lại.");
+        } finally {
+            setIsResendingVerification(false);
         }
     };
 
@@ -177,10 +198,10 @@ const AuthPage = () => {
             <div className="auth-overlay-dark"></div>
 
             <div className={`auth-container ${isSignUp ? 'right-panel-active' : ''}`}>
-                
                 {/* ĐĂNG KÝ */}
                 <div className="form-container register-container">
                     <form onSubmit={handleRegister} className="auth-form-container">
+                        <h2>Đăng Ký</h2>
                         <div className="auth-input-group">
                             <label className="auth-label">Họ và tên</label>
                             <input type="text" name="fullname" value={formData.fullname} onChange={handleChange} placeholder="VD: Nguyễn Văn A" className="auth-input-field" required />
@@ -286,6 +307,77 @@ const AuthPage = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* VERIFICATION MODAL */}
+                {isVerificationModalOpen && (
+                    <div style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000
+                    }}>
+                        <div style={{
+                            backgroundColor: 'white',
+                            padding: '40px',
+                            borderRadius: '12px',
+                            maxWidth: '450px',
+                            width: '90%',
+                            textAlign: 'center',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+                        }}>
+                            <h2 style={{ color: '#333', marginBottom: '15px' }}>📧 Xác Minh Email</h2>
+                            <p style={{ color: '#666', marginBottom: '10px', fontSize: '14px' }}>
+                                Tài khoản của bạn chưa được xác minh. Vui lòng kiểm tra email <strong>{unverifiedEmail}</strong> để nhận link xác minh.
+                            </p>
+                            <p style={{ color: '#999', fontSize: '12px', marginBottom: '30px' }}>
+                                Email có thể nằm trong thư mục Spam hoặc Promotions.
+                            </p>
+                            
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                <button
+                                    onClick={handleResendVerification}
+                                    disabled={isResendingVerification}
+                                    style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: '#ff9f1c',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    {isResendingVerification ? '⏳ Đang gửi...' : '✉️ Gửi Lại Email'}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsVerificationModalOpen(false);
+                                        setFormData({ fullname: '', username: '', email: '', password: '' });
+                                    }}
+                                    style={{
+                                        padding: '12px 24px',
+                                        backgroundColor: '#ddd',
+                                        color: '#333',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    ← Quay Lại
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

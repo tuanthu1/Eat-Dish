@@ -6,5 +6,6 @@ const { verifyToken, checkAdmin } = require('../middleware/auth');
 
 // Nếu có bảo mật: router.post('/bot', verifyToken, checkAdmin, adminChatController.processAdminCommand);
 router.post('/bot', verifyToken, checkAdmin, adminChatController.processAdminCommand);
+router.post('/bot/confirm', verifyToken, checkAdmin, adminChatController.confirmAdminAction);
 
 module.exports = router;

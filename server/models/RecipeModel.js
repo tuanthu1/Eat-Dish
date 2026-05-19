@@ -15,7 +15,7 @@ const recipeSchema = new mongoose.Schema({
     steps: [{ type: String }],
     
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    is_premium: { type: Boolean, default: false },
+    is_premium: { type: Number, default: 0 },
     
     // Trỏ tới các bài đánh giá để đếm số sao trung bình dễ hơn
     reviews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }]

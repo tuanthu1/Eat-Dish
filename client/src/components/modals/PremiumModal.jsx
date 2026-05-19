@@ -56,6 +56,16 @@ const PremiumModal = ({ isOpen, onClose }) => {
         return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
+    const normalizeBenefitText = (benefit) => {
+        // Handle string benefits
+        if (typeof benefit === 'string') return benefit;
+        // Handle object benefits - extract name property only
+        if (!benefit || typeof benefit !== 'object') return 'Quyền lợi';
+        // Safely extract text property, never return the object itself
+        const text = benefit.name || benefit.description || benefit.id || 'Quyền lợi';
+        return String(text); // Ensure it's a string, not an object
+    };
+
     // Load danh sách gói cước và trạng thái VIP
     useEffect(() => {
         // Nếu modal chưa mở thì không làm gì cả
@@ -63,9 +73,9 @@ const PremiumModal = ({ isOpen, onClose }) => {
 
         const fetchData = async () => {
             try {
-                // 🛑 BƯỚC BẢO VỆ CHÍNH: Kiểm tra thẻ ra vào (Token)
-                const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-                if (!token) {
+                // 🛑 BƯỚC BẢO VỆ CHÍNH: Kiểm tra thẻ ra vào
+                const userStr = localStorage.getItem("user") || localStorage.getItem("eatdish_user_id");
+                if (!userStr) {
                     toast.warning("Phòng VIP chỉ dành cho thành viên! Vui lòng đăng nhập!");
                     onClose(); // Đóng ngay cái Modal lại
                     navigate('/login-register'); // Bế thẳng ra ngoài trang đăng nhập
@@ -73,14 +83,14 @@ const PremiumModal = ({ isOpen, onClose }) => {
                 }
 
                 // Chỗ API cũ của mày giữ nguyên
-                const resPkgs = await axiosClient.get('/packages');
+                const resPkgs = await axiosClient.get('/premium/packages');
                 if (resPkgs.data && resPkgs.data.length > 0) {
                     const activePackages = resPkgs.data.filter(p => p.is_active == 1);
                     setPackages(activePackages);
                     setSelectedPkg(activePackages[0]);
                 }
 
-                const resStatus = await axiosClient.get(`/status?t=${Date.now()}`);
+                const resStatus = await axiosClient.get(`/premium/status?t=${Date.now()}`);
                 setPremiumInfo({
                     isPremium: resStatus.data.is_premium == 1,
                     expireDate: resStatus.data.premium_until
@@ -189,10 +199,15 @@ const PremiumModal = ({ isOpen, onClose }) => {
                             <p style={{ fontWeight: 'bold', marginBottom: 5, color: '#2d3436', fontSize: '13px' }}>
                                 <Gem color='#2092de' /> Đặc quyền {selectedPkg.name}:
                             </p>
-                            {selectedPkg.benefits ? (
-                                (typeof selectedPkg.benefits === 'string' ? JSON.parse(selectedPkg.benefits) : selectedPkg.benefits).slice(0, 3).map((item, i) => (
-                                    <div key={i} style={{ marginBottom: 2, fontSize: '12px' }}><SquareCheck fill="#00b894" /> {item}</div>
-                                ))
+                            {selectedPkg?.benefits && Array.isArray(selectedPkg.benefits) && selectedPkg.benefits.length > 0 ? (
+                                selectedPkg.benefits.slice(0, 3).map((item, i) => {
+                                    const benefitText = normalizeBenefitText(item);
+                                    return (
+                                        <div key={i} style={{ marginBottom: 2, fontSize: '12px' }}>
+                                            <SquareCheck fill="#00b894" /> {benefitText}
+                                        </div>
+                                    );
+                                })
                             ) : (
                                 <p style={{ fontSize: '12px' }}>Đang tải quyền lợi...</p>
                             )}
@@ -204,10 +219,18 @@ const PremiumModal = ({ isOpen, onClose }) => {
                         <input
                             type="text" placeholder="Mã giảm giá"
                             value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            onChange={(e) => {
+                                const nextCode = e.target.value.toUpperCase();
+                                setCouponCode(nextCode);
+                                if (appliedDiscount && appliedDiscount.code !== nextCode) {
+                                    setAppliedDiscount(null);
+                                }
+                            }}
                             style={inputStyle}
                         />
-                        <button onClick={handleApplyCoupon} style={applyBtnStyle}>Áp dụng</button>
+                        {!appliedDiscount && (
+                            <button onClick={handleApplyCoupon} style={applyBtnStyle}>Áp dụng</button>
+                        )}
                     </div>
                     {couponMsg && (
                         <p style={{ color: couponMsg.startsWith(<SquareCheck color='#00b894' />) ? '#00b894' : '#ff7675', fontSize: '11px', margin: '0 0 10px 0', textAlign: 'left' }}>{couponMsg}</p>

@@ -5,10 +5,29 @@ import { useNavigate } from 'react-router-dom';
 import '../../index.css';
 import { toast } from 'react-toastify';
 import { TERMS_OF_SERVICE, PRIVACY_POLICY, COOKIE_POLICY, COMMUNITY_GUIDELINES, FAQ_CONTENT } from '../../data/policyContent';
-import { ShieldCogCorner,LockKeyholeOpen, Bell, ShieldQuestionMark, MailOpen, Scale, LogIn, LogOut, FileText, Cookie, Handshake, Lock } from 'lucide-react';
+import { ShieldCogCorner,LockKeyholeOpen, Bell, ShieldQuestionMark, MailOpen, Scale, LogIn, LogOut, FileText, Cookie, Handshake, Lock, MessageCircle } from 'lucide-react';
+import ChatHistoryView from './ChatHistoryView';
 
 const SettingView = ({ user }) => {
-    const getUserId = () => user?.id || localStorage.getItem('eatdish_user_id');
+    const normalizeUserId = (value) => {
+        if (!value || value === 'undefined' || value === 'null') return null;
+        return value;
+    };
+
+    const isValidMongoId = (value) => typeof value === 'string' && /^[a-f\d]{24}$/i.test(value);
+
+    const getUserId = () => {
+        const storedUser = (() => {
+            try {
+                return JSON.parse(localStorage.getItem('user') || localStorage.getItem('eatdish_user') || '{}');
+            } catch (e) {
+                return {};
+            }
+        })();
+
+        const candidateId = normalizeUserId(user?.id || user?._id || storedUser?.id || storedUser?._id || localStorage.getItem('eatdish_user_id'));
+        return isValidMongoId(candidateId) ? candidateId : null;
+    };
     const currentUserId = getUserId();
     const [activeTab, setActiveTab] = useState('main'); 
     const [accountSubView, setAccountSubView] = useState('main'); 
@@ -30,13 +49,26 @@ const SettingView = ({ user }) => {
 
     const closeConfirmModal = () => setConfirmModal({ ...confirmModal, isOpen: false });
 
-    const renderPageContent = (title, content, backTo = 'main') => (
+    const renderPageContent = (title, items, backTo = 'main') => (
         <div className="fadeIn setting-view-container">
             <div className="setting-header-row">
                 <button onClick={() => setActiveTab(backTo)} className="btn-setting-back">←</button>
                 <h2 className="setting-header-title">{title}</h2>
             </div>
-            <div className="setting-document-content">{content}</div>
+            <div className="setting-document-content">
+                {Array.isArray(items) && items.map((item, index) => (
+                    <div key={item.title || item.question || index} style={{ marginBottom: '18px' }}>
+                        {'title' in item && <h3 style={{ marginBottom: '8px' }}>{item.title}</h3>}
+                        {'content' in item && <p style={{ margin: 0, lineHeight: 1.8 }}>{item.content}</p>}
+                        {'question' in item && (
+                            <>
+                                <h3 style={{ marginBottom: '8px' }}>{item.question}</h3>
+                                <p style={{ margin: 0, lineHeight: 1.8 }}>{item.answer}</p>
+                            </>
+                        )}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 
@@ -63,7 +95,7 @@ const SettingView = ({ user }) => {
             closeConfirmModal(); 
             toast.success("Đổi mật khẩu thành công! Vui lòng đăng nhập lại."); 
             setPasswordData({ old: '', new: '', confirm: '' });
-            setTimeout(() => { localStorage.clear(); window.location.href = '/login-register'; }, 2000);
+            setTimeout(async () => { try{await axiosClient.post('/auth/logout');}catch(e){} localStorage.clear(); window.location.href = '/login-register'; }, 2000);
         } catch (err) { 
             closeConfirmModal(); 
             toast.error(err.response?.data?.message || "Đổi mật khẩu thất bại."); 
@@ -73,7 +105,8 @@ const SettingView = ({ user }) => {
     const executeDeleteAccount = async () => {
         try { 
             await axiosClient.delete(`/users/${user.id}`); 
-            localStorage.clear(); 
+            try{await axiosClient.post('/auth/logout');}catch(e){}
+            localStorage.clear();
             window.location.href = '/login-register'; 
         } catch (err) { 
             closeConfirmModal();
@@ -136,7 +169,12 @@ const SettingView = ({ user }) => {
             isOpen: true,
             title: "Xác nhận đăng xuất",
             message: "Bạn có chắc chắn muốn đăng xuất không?",
-            onConfirm: () => {localStorage.clear(); navigate('/login-register'); toast.success("Đăng xuất thành công!");}
+            onConfirm: async () => {
+                try { await axiosClient.post('/auth/logout'); } catch(e) {}
+                localStorage.clear(); 
+                navigate('/login-register'); 
+                toast.success("Đăng xuất thành công!");
+            }
         });
     };
 
@@ -151,10 +189,11 @@ const SettingView = ({ user }) => {
                     <div className="setting-content-card">
                         <div className="setting-menu-row" onClick={() => setActiveTab('account_settings')}><span><ShieldCogCorner fill='#00e1ff' color='#000000'/> Tài khoản & Bảo mật</span><span>〉</span></div>
                         <div className="setting-menu-row" onClick={() => setActiveTab('notifications_settings')}><span><Bell fill='#f1c40f' color='#000000'/> Cài đặt thông báo</span><span>〉</span></div>
+                        <div className="setting-menu-row" onClick={() => setActiveTab('chat_history')}><span><MessageCircle fill='#3498db' color='#000000'/> Lịch sử Chat</span><span>〉</span></div>
                         <div className="setting-menu-row" onClick={() => setActiveTab('faq')}><span><ShieldQuestionMark fill='#ffea95' color='#393939'/> Câu hỏi thường gặp (FAQ)</span><span>〉</span></div>
                         <div className="setting-menu-row" onClick={() => setActiveTab('feedback')}><span><MailOpen fill='#f57171' color='#000000'/>Góp ý & Phản hồi</span><span>〉</span></div>
                         <div className="setting-menu-row no-border" onClick={() => setActiveTab('policies_menu')}><span><Scale fill='#f1c40f' color='#000000'/>Pháp lý & Chính sách</span><span>〉</span></div>
-                        {localStorage.getItem('token') ? (
+                        {currentUserId ? (
                             <div className="setting-menu-row no-border" onClick={handleLogout}>
                                 <span><LogOut /> Đăng xuất</span>
                             </div>
@@ -301,6 +340,18 @@ const SettingView = ({ user }) => {
                         >
                             {isSubmitting ? 'Đang lưu...' : 'Lưu cài đặt'}
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'chat_history' && (
+                <div className="fadeIn setting-view-container">
+                    <div className="setting-header-row">
+                        <button onClick={() => setActiveTab('main')} className="btn-setting-back">←</button>
+                        <h2 className="setting-header-title">Lịch sử Chat</h2>
+                    </div>
+                    <div className="setting-content-card">
+                        <ChatHistoryView userId={currentUserId} />
                     </div>
                 </div>
             )}

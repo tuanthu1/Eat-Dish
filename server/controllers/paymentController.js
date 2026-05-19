@@ -11,27 +11,55 @@ const PAYOS_API = "https://api-merchant.payos.vn/v2/payment-requests";
 exports.checkCoupon = async (req, res) => {
     const { code } = req.body;
     try {
-        const coupon = await DiscountCode.findOne({
-            code,
-            is_active: true,
-            $or: [
-                { expiry_date: { $gte: new Date() } },
-                { expiry_date: null }
-            ]
-        });
+        // Atomically increment used_count if usage limit not reached (reserve one use)
+        const now = new Date();
+        const updated = await DiscountCode.findOneAndUpdate(
+            {
+                code,
+                is_active: true,
+                $and: [
+                    { $or: [{ expiry_date: { $gte: now } }, { expiry_date: null }] },
+                    { $or: [{ usage_limit: null }, { $expr: { $gt: ["$usage_limit", "$used_count"] } }] }
+                ]
+            },
+            { $inc: { used_count: 1 } },
+            { new: true }
+        );
 
-        if (!coupon) {
-            return res.status(404).json({ message: "Mã không hợp lệ hoặc đã hết hạn" });
+        if (!updated) {
+            // Try to provide a clearer reason for failure to help debugging
+            try {
+                const found = await DiscountCode.findOne({ code });
+                if (!found) {
+                    return res.status(404).json({ message: 'Mã không tồn tại' });
+                }
+                if (!found.is_active) {
+                    return res.status(400).json({ message: 'Mã chưa được kích hoạt' });
+                }
+                if (found.expiry_date && new Date(found.expiry_date) < now) {
+                    return res.status(400).json({ message: 'Mã đã hết hạn' });
+                }
+                if (found.usage_limit !== null && found.usage_limit !== undefined) {
+                    if ((found.used_count || 0) >= found.usage_limit) {
+                        return res.status(400).json({ message: 'Mã đã đạt giới hạn lượt sử dụng' });
+                    }
+                }
+            } catch (dbgErr) {
+                console.error('checkCoupon diagnostic failed:', dbgErr);
+            }
+            return res.status(400).json({ message: 'Mã không hợp lệ hoặc đã hết hạn/đạt giới hạn lượt sử dụng' });
         }
+
         await ActivityLog.create({
             admin: req.user ? req.user.id : null,
             action: "Tài khoản " + req.user.id + " đã áp dụng mã giảm giá: " + code
         });
-        res.json({ 
-            success: true, 
-            percent: coupon.percent, 
-            code: coupon.code,
-            message: `Áp dụng mã ${coupon.code} thành công! Giảm ${coupon.percent}%` 
+
+        res.json({
+            success: true,
+            percent: updated.percent,
+            code: updated.code,
+            message: `Áp dụng mã ${updated.code} thành công! Giảm ${updated.percent}%`
         });
     } catch (error) {
         console.error("Lỗi check coupon:", error);
@@ -67,6 +95,12 @@ exports.createPaymentLink = async (req, res) => {
                     { expiry_date: null }
                 ]
             });
+            // check usage limit based on apply-time reservations
+            if (codeDoc && codeDoc.usage_limit !== null && codeDoc.usage_limit !== undefined) {
+                if ((codeDoc.used_count || 0) >= codeDoc.usage_limit) {
+                    return res.status(400).json({ message: 'Mã giảm giá đã hết lượt sử dụng' });
+                }
+            }
             
             if (codeDoc) {
                 const percent = codeDoc.percent;
@@ -90,12 +124,8 @@ exports.createPaymentLink = async (req, res) => {
                 startDate = new Date(currentUser.premium_until); 
             }
 
-            if (discountCode) {
-                await DiscountCode.findOneAndUpdate(
-                    { code: discountCode },
-                    { $inc: { used_count: 1 } }
-                );
-            }
+            // Note: `used_count` should already have been incremented when the user applied the coupon.
+            // We mark the payment as having reserved the coupon below.
 
             const premiumUntil = new Date(startDate);
             premiumUntil.setDate(premiumUntil.getDate() + durationDays);
@@ -106,6 +136,7 @@ exports.createPaymentLink = async (req, res) => {
                 amount,
                 status: 'pending',
                 coupon_code: discountCode || null,
+                coupon_reserved: !!discountCode,
                 package: packageId || null
             });
             
@@ -149,6 +180,7 @@ exports.createPaymentLink = async (req, res) => {
                 amount,
                 status: 'pending',
                 coupon_code: discountCode || null,
+                coupon_reserved: !!discountCode,
                 package: packageId || null
             });
             return res.json({ checkoutUrl: response.data.data.checkoutUrl });
@@ -230,6 +262,15 @@ exports.handleWebhook = async (req, res) => {
                     { order_id: orderCode },
                     { status: 'success' }
                 );
+
+                // Nếu có coupon được dùng cho đơn này nhưng chưa được đánh dấu là reserved, tăng used_count
+                try {
+                    if (payment && payment.coupon_code && !payment.coupon_reserved) {
+                        await DiscountCode.findOneAndUpdate({ code: payment.coupon_code }, { $inc: { used_count: 1 } });
+                    }
+                } catch (incErr) {
+                    console.error('Lỗi tăng used_count cho coupon:', incErr);
+                }
 
                 // Tính ngày hết hạn mới
                 const premiumUntil = new Date(startDate);
@@ -331,6 +372,29 @@ exports.verifyReturn = async (req, res) => {
                 { order_id: orderCode },
                 { status: 'success' }
             );
+
+            // Tăng used_count nếu có coupon nhưng chưa reserved
+            try {
+                if (payment && payment.coupon_code && !payment.coupon_reserved) {
+                    await DiscountCode.findOneAndUpdate({ code: payment.coupon_code }, { $inc: { used_count: 1 } });
+                }
+            } catch (incErr) {
+                console.error('Lỗi tăng used_count cho coupon (verifyReturn):', incErr);
+            }
+
+            // Notify user about verified payment
+            try {
+                const Notification = require('../models/Notification');
+                if (payment && payment.user) {
+                    await Notification.create({
+                        user: payment.user,
+                        message: `Giao dịch ${orderCode} đã được xác nhận. Cảm ơn bạn!`,
+                        type: 'payment'
+                    });
+                }
+            } catch (notifErr) {
+                console.error('Lỗi tạo notification verifyReturn:', notifErr);
+            }
 
             const premiumUntil = new Date(startDate);
             premiumUntil.setDate(premiumUntil.getDate() + durationDays);

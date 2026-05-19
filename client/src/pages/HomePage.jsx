@@ -18,6 +18,7 @@ import ConfirmModal from '../components/modals/ConfirmModal';
 import PremiumView from '../components/view/PremiumView';
 import PremiumModal from '../components/modals/PremiumModal';
 import MobileBottomNav from '../components/MobileBottomNav';
+import ScrollFollowEffect from '../components/ScrollFollowEffect';
 import { toast } from 'react-toastify';
 import { DEFAULT_RECIPE_CLASSIFICATIONS } from '../data/recipeClassifications';
 import '../index.css'; 
@@ -365,7 +366,7 @@ const HomePage = () => {
         formData.append('category', uploadData.category || 'Khac');
         formData.append('meal_type', uploadData.meal_type || 'Khong_xac_dinh');
         
-        formData.append('is_premium', uploadData.is_premium ? 1 : 0);
+        formData.append('is_premium', uploadData.is_premium ?? 0);
 
         try {
             const res = await axiosClient.post('/recipes/upload', formData, {
@@ -447,6 +448,7 @@ const HomePage = () => {
                 const res = await axiosClient.delete(`/users/${user.id}`);
                 if (res.data.status === 'success') {
                     toast.success("Tài khoản của bạn đã bị xóa.");
+                    try { await axiosClient.post('/auth/logout'); } catch(e) {}
                     localStorage.clear();
                     window.location.href = '/login-register';
                 }
@@ -512,62 +514,47 @@ const HomePage = () => {
     useEffect(() => {
         const fetchAllData = async () => {
             try {
-                let currentUser = null;
-                
-                try {
-                    const resAuth = await axiosClient.get('/auth/me');
-                    currentUser = resAuth.data.user;
+                const cachedUser = (() => {
+                    try {
+                        return JSON.parse(localStorage.getItem('user') || 'null');
+                    } catch (error) {
+                        return null;
+                    }
+                })();
+                const cachedUserId = String(cachedUser?.id || cachedUser?._id || localStorage.getItem('eatdish_user_id') || '');
+
+                if (cachedUser) {
+                    setUser({
+                        ...cachedUser,
+                        id: cachedUserId || cachedUser.id
+                    });
+                }
+
+                const authPromise = axiosClient.get('/auth/me').catch(() => null);
+
+                // Lấy sở thích từ localStorage để gửi kèm khi tải công thức, giúp cá nhân hóa kết quả
+                const prefs = JSON.parse(localStorage.getItem('eatdish_prefs') || '[]');
+                const prefString = prefs.join(',');
+                const queryParams = cachedUserId 
+                    ? `?userId=${cachedUserId}&prefs=${prefString}` 
+                    : `?prefs=${prefString}`;
+
+                const recipePromise = axiosClient.get(`/recipes${queryParams}`);
+                const [resAuth, resRecipes] = await Promise.all([authPromise, recipePromise]);
+
+                if (resAuth?.data?.user) {
+                    const currentUser = resAuth.data.user;
                     currentUser.id = currentUser._id || currentUser.id;
-                    setUser(currentUser); 
-                } catch (err) {
+                    setUser(currentUser);
+                } else if (!cachedUser) {
                     setUser({
                         id: null, fullname: 'Khách', username: 'Khách',
                         avatar: `https://ui-avatars.com/api/?name=Khách&background=random&length=2&size=128`,
                         stats: { recipes: 0, followers: 0, following: 0 }
                     });
                 }
-                // Lấy sở thích từ localStorage để gửi kèm khi tải công thức, giúp cá nhân hóa kết quả
-                // Mình sẽ lưu 3 thể loại gần nhất mà người dùng xem vào localStorage dưới dạng mảng JSON, 
-                // mỗi khi tải trang sẽ gửi lên backend để ưu tiên hiển thị những món ăn thuộc các thể loại đó
-                const prefs = JSON.parse(localStorage.getItem('eatdish_prefs') || '[]');
-                // Chuyển mảng thành chuỗi phân cách bằng dấu phẩy để gửi lên backend
-                const prefString = prefs.join(',');
-                // Nếu có user thì gửi cả userId và prefs, 
-                // nếu không có user thì chỉ gửi prefs thôi
-                const queryParams = currentUser 
-                    ? `?userId=${currentUser.id}&prefs=${prefString}` 
-                    : `?prefs=${prefString}`;
-                // Tải công thức, sở thích, thông báo, 
-                // bài viết cộng đồng và danh sách chặn (nếu có user)
-                const apiCalls = [
-                    axiosClient.get(`/recipes${queryParams}`) 
-                ];
 
-                if (currentUser) {
-                    apiCalls.push(
-                        axiosClient.get(`/recipes/favorites/${currentUser.id}`),
-                        axiosClient.get(`/notifications/${currentUser.id}`),
-                        axiosClient.get(`/community?userId=${currentUser.id}`),
-                        axiosClient.get(`/users/blocks?userId=${currentUser.id}`)
-                    );
-                }
-
-                const results = await Promise.all(apiCalls);
-
-                setRecipes(results[0].data);
-
-                if (currentUser) {
-                    setFavorites(results[1].data.map((f) => String(f.id || f._id || f.recipe_id || f.recipeId))); 
-                    setNotifications(results[2].data);
-                    setCommunityPosts(results[3].data);
-
-                    if (results[4] && results[4].data) {
-                        const blockedIdsArray = Array.isArray(results[4].data) 
-                            ? results[4].data.map(item => String(item.id || item._id || item.block_id || item)) 
-                            : [];
-                        setBlockedUserIds(blockedIdsArray);
-                    }
-                }
+                setRecipes(resRecipes.data);
 
             } catch (error) {
                 console.log("Lỗi tải dữ liệu trang chủ:", error);
@@ -576,6 +563,52 @@ const HomePage = () => {
 
         fetchAllData();
     }, []);
+
+    useEffect(() => {
+        if (!user?.id) {
+            setFavorites([]);
+            setNotifications([]);
+            setBlockedUserIds([]);
+            return;
+        }
+
+        const fetchUserExtras = async () => {
+            try {
+                const [favRes, notifRes, blockRes] = await Promise.all([
+                    axiosClient.get(`/recipes/favorites/${user.id}`),
+                    axiosClient.get(`/notifications/${user.id}`),
+                    axiosClient.get(`/users/blocks?userId=${user.id}`)
+                ]);
+
+                setFavorites((favRes.data || []).map((f) => String(f.id || f._id || f.recipe_id || f.recipeId)));
+                setNotifications(notifRes.data || []);
+
+                const blockedIdsArray = Array.isArray(blockRes.data)
+                    ? blockRes.data.map(item => String(item.id || item._id || item.block_id || item))
+                    : [];
+                setBlockedUserIds(blockedIdsArray);
+            } catch (err) {
+                console.log("Lỗi tải dữ liệu user phụ:", err);
+            }
+        };
+
+        fetchUserExtras();
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (activeTab !== 'community' || !user?.id) return;
+
+        const fetchCommunity = async () => {
+            try {
+                const res = await axiosClient.get(`/community?userId=${user.id}`);
+                setCommunityPosts(res.data || []);
+            } catch (err) {
+                console.log("Lỗi tải cộng đồng:", err);
+            }
+        };
+
+        fetchCommunity();
+    }, [activeTab, user?.id]);
     // Lấy phân loại món ăn từ backend
     useEffect(() => {
         const fetchRecipeClassifications = async () => {
@@ -608,10 +641,27 @@ const HomePage = () => {
     }, []);
 
     const unreadCount = notifications.filter(n => n.is_read === 0).length;
-    const visibleRecipes = recipes.filter(r => 
-        !blockedUserIds.includes(Number(r.author_id)) && 
-        !blockedUserIds.includes(Number(r.user_id))
-    );
+    const getRecipePremiumLevel = (recipe) => {
+        const rawLevel = recipe?.premium_level ?? recipe?.is_premium ?? recipe?.is_vip ?? 0;
+        if (rawLevel === true || rawLevel === 'true') return 1;
+        const parsed = Number.parseInt(String(rawLevel), 10);
+        return Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    };
+
+    const visibleRecipes = [...recipes]
+        .filter(r => 
+            !blockedUserIds.includes(Number(r.author_id)) && 
+            !blockedUserIds.includes(Number(r.user_id))
+        )
+        .sort((a, b) => {
+            const aPremium = getRecipePremiumLevel(a);
+            const bPremium = getRecipePremiumLevel(b);
+            if (aPremium !== bPremium) return aPremium - bPremium;
+
+            const aTime = new Date(a.created_at || a.createdAt || 0).getTime();
+            const bTime = new Date(b.created_at || b.createdAt || 0).getTime();
+            return bTime - aTime;
+        });
 
     const visibleCommunity = communityPosts.filter(p => 
         !blockedUserIds.includes(Number(p.user_id)) && 
@@ -641,6 +691,7 @@ const HomePage = () => {
                     }} 
                     onOpenFilter={() => setShowFilter(true)} 
                 />
+                <ScrollFollowEffect />
                 <MobileBottomNav 
                     activeTab={activeTab} 
                     setActiveTab={setActiveTab} 

@@ -1,4 +1,4 @@
-import InteractiveLogo from '../components/InteractiveLogo';
+import InteractiveLogo from './InteractiveLogo';
 import '../index.css';
 import { CookingPot, Users, Crown, Settings, Heart } from 'lucide-react';
 const Sidebar = ({ activeTab, setActiveTab, onOpenUpload, currentUser }) => {

@@ -2,8 +2,14 @@
 const User = require('../models/UserModel');
 const Recipe = require('../models/RecipeModel');
 const ActivityLog = require('../models/ActivityLogModel');
+const Feedback = require('../models/Feedback');
+const Review = require('../models/Review');
+const CommunityPost = require('../models/CommunityPost');
+const SearchAnalytics = require('../models/SearchAnalyticsModel');
+const PendingAdminAction = require('../models/PendingAdminAction');
 const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const crypto = require('crypto');
 exports.processAdminCommand = async (req, res) => {
     try {
         const { message } = req.body;
@@ -31,6 +37,8 @@ exports.processAdminCommand = async (req, res) => {
             14. "RESTART_SERVER": Khởi động lại server để áp dụng các thay đổi hoặc fix lỗi tạm thời. (Tham số: null) - CẢNH BÁO: HÀNH ĐỘNG NÀY SẼ GIÁN ĐOẠN DỊCH VỤ TRONG VÀI GIÂY, CHỈ DÙNG KHI THẬT SỰ CẦN THIẾT!
             15. "CHAT_NORMAL": Dùng khi Admin hỏi kiến thức bình thường, chào hỏi, hoặc các yêu cầu không nằm trong các quyền quản trị ở trên. (Tham số: reply_text).
             16. "GET_USER_LIST": Lấy danh sách toàn bộ người dùng mới nhất trên hệ thống (Tham số: null).
+            17. "GET_TOP_FAVORITE_RECIPES": Dùng khi Admin hỏi món yêu thích, món được tim, món được thích nhiều. Kết quả phải hiển thị theo tym. (Tham số: null).
+            18. "GET_TOP_CLICKED_RECIPES": Dùng khi Admin hỏi món được ấn, được bấm, click nhiều, xem nhiều. Kết quả phải hiển thị theo lượt bấm. (Tham số: null).
             ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
             {
                 "action": "TÊN_HÀNH_ĐỘNG",
@@ -45,6 +53,14 @@ exports.processAdminCommand = async (req, res) => {
             Ví dụ 2:
             User: "Chào em, hôm nay em khỏe không?"
             Bot: {"action": "CHAT_NORMAL", "params": {}, "botReply": "Dạ em là AI nên lúc nào cũng khỏe ạ! Sếp cần em giúp gì không?"}
+
+            Ví dụ 3:
+            User: "Lấy món yêu thích nhiều"
+            Bot: {"action": "GET_TOP_FAVORITE_RECIPES", "params": {}, "botReply": "Dạ em lấy top món yêu thích theo tym cho sếp ạ."}
+
+            Ví dụ 4:
+            User: "Lấy món được ấn nhiều"
+            Bot: {"action": "GET_TOP_CLICKED_RECIPES", "params": {}, "botReply": "Dạ em lấy top món được bấm nhiều nhất cho sếp ạ."}
         `;
         const aiResponseString = await callYourAI(systemPrompt, message); 
         
@@ -57,6 +73,39 @@ exports.processAdminCommand = async (req, res) => {
 
         const { action, params, botReply } = aiData;
         let finalReply = botReply;
+
+        // Những hành động mang tính hủy hoại / thay đổi dữ liệu cần xác nhận
+        const requiresConfirmation = new Set([
+            'DELETE_SPAM_RECIPE',
+            'BAN_USER',
+            'CLEAR_LOGS',
+            'DELETE_FEEDBACK',
+            'RESTART_SERVER',
+            'UPDATE_USER_ROLE'
+        ]);
+
+        if (requiresConfirmation.has(action)) {
+            // Tạo token xác nhận và lưu pending action
+            const token = crypto.randomBytes(12).toString('hex');
+            const pending = await PendingAdminAction.create({
+                admin: req.user?.id,
+                username: req.user?.username || req.user?.email || 'admin',
+                action,
+                params,
+                token,
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 giờ
+            });
+
+            await ActivityLog.create({
+                username: req.user?.username || 'admin',
+                action: `Tạo yêu cầu xác nhận cho hành động: ${action}`,
+                details: { token }
+            });
+
+            finalReply = `${botReply}\n\n⚠️ Lệnh này yêu cầu XÁC NHẬN. Token xác nhận: ${token}\nGửi yêu cầu xác nhận tới endpoint '/admin/chat/bot/confirm' với body { token: '${token}' } hoặc sử dụng giao diện quản trị để xác nhận. Token có hiệu lực 24 giờ.`;
+            return res.status(200).json({ reply: finalReply });
+        }
+
         switch (action) {
             case 'SEARCH_USERS':
                 if (!params.keyword) {
@@ -113,7 +162,98 @@ exports.processAdminCommand = async (req, res) => {
 
             case 'GET_STATS':
                 const userCount = await User.countDocuments();
-                finalReply += `\n Hiện tại hệ thống đang có ${userCount} người dùng đăng ký.`;
+                const recipeCount = await Recipe.countDocuments();
+                const reviewCount = await Review.countDocuments({ status: { $ne: 'deleted' } });
+                const communityPostCount = await CommunityPost.countDocuments({ status: { $ne: 'deleted' } });
+                
+                finalReply = `📊 **THỐNG KÊ HỆ THỐNG:**\n\n` +
+                    `👥 Người dùng: ${userCount}\n` +
+                    `🍲 Công thức nấu ăn: ${recipeCount}\n` +
+                    `⭐ Đánh giá/Reviews: ${reviewCount}\n` +
+                    `💬 Bài viết cộng đồng: ${communityPostCount}`;
+                break;
+            
+            case 'GET_TOP_FAVORITE_RECIPES':
+                const topRecipes = await User.aggregate([
+                    {
+                        $unwind: '$favorites'
+                    },
+                    {
+                        $group: {
+                            _id: '$favorites',
+                            favoriteCount: { $sum: 1 }
+                        }
+                    },
+                    { $sort: { favoriteCount: -1 } },
+                    { $limit: 10 },
+                    {
+                        $lookup: {
+                            from: 'recipes',
+                            localField: '_id',
+                            foreignField: '_id',
+                            as: 'recipe'
+                        }
+                    },
+                    { $unwind: '$recipe' },
+                    {
+                        $project: {
+                            _id: 0,
+                            recipeId: '$_id',
+                            name: '$recipe.name',
+                            favoriteCount: 1,
+                            is_premium: '$recipe.is_premium'
+                        }
+                    }
+                ]);
+                
+                if (topRecipes.length > 0) {
+                    const topRecipesList = topRecipes.map((r, index) =>
+                        `${index + 1}. 🍲 ${r.name} (${r.favoriteCount} tym) ${r.is_premium > 0 ? '👑' : ''}`
+                    ).join('\n');
+                    finalReply = `🏆 **TOP CÔNG THỨC YÊU THÍCH NHẤT:**\n\n${topRecipesList}`;
+                } else {
+                    finalReply = `Chưa có công thức nào được yêu thích.`;
+                }
+                break;
+
+            case 'GET_TOP_CLICKED_RECIPES':
+                const topClickedRecipes = await SearchAnalytics.aggregate([
+                    {
+                        $group: {
+                            _id: '$recipe',
+                            totalClicks: { $sum: '$clicks' }
+                        }
+                    },
+                    { $sort: { totalClicks: -1 } },
+                    { $limit: 10 },
+                    {
+                        $lookup: {
+                            from: 'recipes',
+                            localField: '_id',
+                            foreignField: '_id',
+                            as: 'recipe'
+                        }
+                    },
+                    { $unwind: '$recipe' },
+                    {
+                        $project: {
+                            _id: 0,
+                            recipeId: '$_id',
+                            name: '$recipe.name',
+                            totalClicks: 1,
+                            is_premium: '$recipe.is_premium'
+                        }
+                    }
+                ]);
+
+                if (topClickedRecipes.length > 0) {
+                    const topClickedList = topClickedRecipes.map((r, index) =>
+                        `${index + 1}. 🍲 ${r.name} (${r.totalClicks} lượt bấm) ${r.is_premium > 0 ? '👑' : ''}`
+                    ).join('\n');
+                    finalReply = `🏆 **TOP CÔNG THỨC ĐƯỢC BẤM NHIỀU NHẤT:**\n\n${topClickedList}`;
+                } else {
+                    finalReply = `Chưa có dữ liệu lượt bấm cho công thức nào.`;
+                }
                 break;
 
             case 'CHAT_NORMAL':
@@ -165,7 +305,7 @@ exports.processAdminCommand = async (req, res) => {
                             ]
                         },
                         { role: params.new_role },
-                        { new: true }
+                        { returnDocument: 'after' }
                     );
                     if (updatedUser) {
                         finalReply = `Đã cập nhật vai trò của người dùng "${params.email_hoac_username}" thành "${params.new_role}".`;
@@ -234,7 +374,7 @@ exports.processAdminCommand = async (req, res) => {
                         ]
                     }, 
                     { is_verified: false }, // Hoặc status: 'banned' tùy Database của mày
-                    { new: true }
+                    { returnDocument: 'after' }
                 );
 
                 if (bannedUser) {
@@ -294,3 +434,127 @@ async function callYourAI(systemPrompt, userMessage) {
         });
     }
 }
+
+exports.confirmAdminAction = async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) return res.status(400).json({ message: 'Thiếu token xác nhận.' });
+
+        const pending = await PendingAdminAction.findOne({ token, status: 'pending' });
+        if (!pending) return res.status(404).json({ message: 'Không tìm thấy yêu cầu xác nhận hợp lệ.' });
+        if (pending.expiresAt && pending.expiresAt < new Date()) {
+            pending.status = 'cancelled';
+            await pending.save();
+            return res.status(400).json({ message: 'Token đã hết hạn.' });
+        }
+
+        // Kiểm tra quyền (middleware route sẽ bảo đảm user là admin), nhưng double-check cũng OK
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ message: 'Bạn cần đăng nhập.' });
+
+        let finalReply = `Đã thực thi hành động ${pending.action}.`;
+        const params = pending.params || {};
+
+        switch (pending.action) {
+            case 'DELETE_SPAM_RECIPE': {
+                if (!params.keyword) {
+                    finalReply = 'Thiếu tham số keyword để xóa.';
+                    break;
+                }
+                const result = await Recipe.deleteMany({
+                    $or: [
+                        { title: { $regex: params.keyword, $options: 'i' } },
+                        { ingredients: { $regex: params.keyword, $options: 'i' } }
+                    ]
+                });
+                finalReply = `Đã xóa ${result.deletedCount || 0} công thức chứa từ '${params.keyword}'.`;
+            }
+            break;
+
+            case 'BAN_USER': {
+                const bannedUser = await User.findOneAndUpdate(
+                    {
+                        $or: [
+                            { username: params.email_hoac_username },
+                            { email: params.email_hoac_username }
+                        ]
+                    },
+                    { is_verified: false },
+                    { returnDocument: 'after' }
+                );
+                if (bannedUser) finalReply = `Đã khóa thành công tài khoản ${params.email_hoac_username}.`;
+                else finalReply = `Không tìm thấy user ${params.email_hoac_username}.`;
+            }
+            break;
+
+            case 'CLEAR_LOGS': {
+                if (!params.days_ago) {
+                    finalReply = 'Thiếu tham số days_ago để xóa nhật ký.';
+                    break;
+                }
+                const cutoff = new Date(Date.now() - Number(params.days_ago) * 24 * 60 * 60 * 1000);
+                const result = await ActivityLog.deleteMany({ createdAt: { $lt: cutoff } });
+                finalReply = `Đã xóa ${result.deletedCount || 0} nhật ký cũ hơn ${params.days_ago} ngày.`;
+            }
+            break;
+
+            case 'DELETE_FEEDBACK': {
+                if (!params.feedback_id) {
+                    finalReply = 'Thiếu feedback_id.';
+                    break;
+                }
+                const deleted = await Feedback.findByIdAndDelete(params.feedback_id);
+                if (deleted) finalReply = `Đã xóa phản hồi ID ${params.feedback_id}.`;
+                else finalReply = `Không tìm thấy phản hồi ID ${params.feedback_id}.`;
+            }
+            break;
+
+            case 'UPDATE_USER_ROLE': {
+                const updatedUser = await User.findOneAndUpdate(
+                    {
+                        $or: [
+                            { username: params.email_hoac_username },
+                            { email: params.email_hoac_username }
+                        ]
+                    },
+                    { role: params.new_role },
+                    { returnDocument: 'after' }
+                );
+                if (updatedUser) finalReply = `Đã cập nhật vai trò của ${params.email_hoac_username} thành ${params.new_role}.`;
+                else finalReply = `Không tìm thấy user ${params.email_hoac_username}.`;
+            }
+            break;
+
+            case 'RESTART_SERVER': {
+                finalReply = `Khởi động lại server được yêu cầu.`;
+                const { exec } = require('child_process');
+                exec('pm2 restart eatdish-server', (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`Lỗi khi khởi động lại server: ${error.message}`);
+                        return;
+                    }
+                    if (stderr) console.error(`Restart stderr: ${stderr}`);
+                    console.log(`Server restarted: ${stdout}`);
+                });
+            }
+            break;
+
+            default:
+                finalReply = `Hành động ${pending.action} chưa được hỗ trợ để thực thi tự động.`;
+        }
+
+        pending.status = 'confirmed';
+        await pending.save();
+
+        await ActivityLog.create({
+            username: req.user?.username || 'admin',
+            action: `Xác nhận và thực thi hành động: ${pending.action}`,
+            details: { pendingId: pending._id }
+        });
+
+        return res.status(200).json({ reply: finalReply });
+    } catch (error) {
+        console.error('confirmAdminAction error:', error);
+        return res.status(500).json({ message: 'Lỗi server khi xác nhận hành động.' });
+    }
+};

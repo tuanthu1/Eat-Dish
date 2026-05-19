@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../../api/axiosClient';
 import './AdminPage.css';
@@ -13,7 +13,6 @@ import PackageDetailModal from '../../components/modals/PackageDetailModal';
 import AdminChatBot from '../../components/AdminChatBot';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import { Scale } from 'lucide-react';
 import { DEFAULT_CATEGORY_OPTIONS, DEFAULT_MEALTYPE_OPTIONS, withAllOption, toLabelMap } from '../../data/recipeClassifications';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -476,7 +475,7 @@ const AdminPage = () => {
         }
     };
     const loadPayments = async () => { try { const res = await axiosClient.get('/admin/history'); setPayments(res.data); } catch (e) { } };
-    const loadPackages = async () => { try { const res = await axiosClient.get('/packages'); setPackages(res.data); } catch (e) { } };
+    const loadPackages = async () => { try { const res = await axiosClient.get('/premium/admin/packages'); setPackages(res.data); } catch (e) { } };
     const loadFeedBacks = async () => { try { const res = await axiosClient.get(`/admin/feedbacks`); setFeedbackList(res.data); } catch (e) { } };
     const loadCoupons = async () => { try { const res = await axiosClient.get(`/admin/coupons`); setCouponList(res.data); } catch (e) { } };
     const loadCommunityPosts = async () => { try { const res = await axiosClient.get(`/admin/community`); setCommunityPosts(res.data); } catch (e) { } };
@@ -804,7 +803,7 @@ const AdminPage = () => {
             loadUsers();
             setIsPremiumModalOpen(false);
             setUserToToggleVIP(null);
-            toast.success(newStatus ? "Đã cấp VIP! 👑" : "Đã hủy VIP!");
+            toast.success(newStatus ? "Đã cấp VIP!" : "Đã hủy VIP!");
         } catch (err) { toast.error("Lỗi cập nhật VIP!"); }
     };
     const toggleRecipeVIP = async (recipe) => {
@@ -1152,23 +1151,23 @@ const AdminPage = () => {
                     <div className="logo-text">ADMIN<br /><span className="logo-highlight">EATDISH</span></div>
                 </header>
 
-                <div className={`admin-menu-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleTabClick('dashboard')}><span className="menu-icon">📊</span><span>Tổng Quan</span></div>
-                <div className={`admin-menu-item ${activeTab === 'users' ? 'active' : ''}`} onClick={() => handleTabClick('users')}><span className="menu-icon">👥</span><span>Người Dùng</span></div>
-                <div className={`admin-menu-item ${activeTab === 'user_reports' ? 'active' : ''}`} onClick={() => handleTabClick('user_reports')}><span className="menu-icon">🚩</span><span>Báo Cáo User</span></div>
-                <div className={`admin-menu-item ${activeTab === 'recipe_reports' ? 'active' : ''}`} onClick={() => handleTabClick('recipe_reports')}><span className="menu-icon">⚠️</span><span>Báo Cáo Món</span></div>
-                <div className={`admin-menu-item ${activeTab === 'recipes' ? 'active' : ''}`} onClick={() => handleTabClick('recipes')}><span className="menu-icon">🍲</span><span>Công Thức</span></div>
-                <div className={`admin-menu-item ${activeTab === 'recipe_categories' ? 'active' : ''}`} onClick={() => handleTabClick('recipe_categories')}><span className="menu-icon">📚</span><span>Danh Mục Món</span></div>
-                <div className={`admin-menu-item ${activeTab === 'recipe_meal_types' ? 'active' : ''}`} onClick={() => handleTabClick('recipe_meal_types')}><span className="menu-icon">🍽️</span><span>Phân Loại Món</span></div>
-                <div className={`admin-menu-item ${activeTab === 'billing' ? 'active' : ''}`} onClick={() => handleTabClick('billing')}><span className="menu-icon">💰</span><span>Doanh Thu</span></div>
-                <div className={`admin-menu-item ${activeTab === 'community' ? 'active' : ''}`} onClick={() => handleTabClick('community')}><span className="menu-icon">💬</span><span>Cộng Đồng</span></div>
-                <div className={`admin-menu-item ${activeTab === 'packages' ? 'active' : ''}`} onClick={() => handleTabClick('packages')}><span className="menu-icon">💎</span><span>Gói Premium</span></div>
-                <div className={`admin-menu-item ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => handleTabClick('coupons')}><span className="menu-icon">🎟️</span><span>Mã Giảm Giá</span></div>
-                <div className={`admin-menu-item ${activeTab === 'activity_logs' ? 'active' : ''}`} onClick={() => handleTabClick('activity_logs')}><span className="menu-icon">📝</span><span>Nhật ký Hoạt động</span></div>
-                <div className={`admin-menu-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleTabClick('settings')}><span className="menu-icon">⚙️</span><span>Cài Đặt</span></div>
-                <div className={`admin-menu-item ${activeTab === 'feedbacks' ? 'active' : ''}`} onClick={() => handleTabClick('feedbacks')}><span className="menu-icon">📭</span><span>Góp Ý</span></div>
-                <div className={`admin-menu-item ${activeTab === 'newsletter' ? 'active' : ''}`} onClick={() => handleTabClick('newsletter')}><span className="menu-icon">📧</span><span>Gửi Email</span></div>
+                <div className={`admin-menu-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleTabClick('dashboard')}><span className="menu-icon"><i className="fi fi-br-chart-pie"></i></span><span>Tổng Quan</span></div>
+                <div className={`admin-menu-item ${activeTab === 'users' ? 'active' : ''}`} onClick={() => handleTabClick('users')}><span className="menu-icon"><i className="fi fi-br-users"></i></span><span>Người Dùng</span></div>
+                <div className={`admin-menu-item ${activeTab === 'user_reports' ? 'active' : ''}`} onClick={() => handleTabClick('user_reports')}><span className="menu-icon"><i className="fi fi-br-flag"></i></span><span>Báo Cáo User</span></div>
+                <div className={`admin-menu-item ${activeTab === 'recipe_reports' ? 'active' : ''}`} onClick={() => handleTabClick('recipe_reports')}><span className="menu-icon"><i className="fi fi-br-triangle-warning"></i></span><span>Báo Cáo Món</span></div>
+                <div className={`admin-menu-item ${activeTab === 'recipes' ? 'active' : ''}`} onClick={() => handleTabClick('recipes')}><span className="menu-icon"><i className="fi fi-br-book-alt"></i></span><span>Công Thức</span></div>
+                <div className={`admin-menu-item ${activeTab === 'recipe_categories' ? 'active' : ''}`} onClick={() => handleTabClick('recipe_categories')}><span className="menu-icon"><i className="fi fi-br-folder"></i></span><span>Danh Mục Món</span></div>
+                <div className={`admin-menu-item ${activeTab === 'recipe_meal_types' ? 'active' : ''}`} onClick={() => handleTabClick('recipe_meal_types')}><span className="menu-icon"><i className="fi fi-br-list"></i></span><span>Phân Loại Món</span></div>
+                <div className={`admin-menu-item ${activeTab === 'billing' ? 'active' : ''}`} onClick={() => handleTabClick('billing')}><span className="menu-icon"><i className="fi fi-br-wallet"></i></span><span>Doanh Thu</span></div>
+                <div className={`admin-menu-item ${activeTab === 'community' ? 'active' : ''}`} onClick={() => handleTabClick('community')}><span className="menu-icon"><i className="fi fi-br-comment"></i></span><span>Cộng Đồng</span></div>
+                <div className={`admin-menu-item ${activeTab === 'packages' ? 'active' : ''}`} onClick={() => handleTabClick('packages')}><span className="menu-icon"><i className="fi fi-br-diamond"></i></span><span>Gói Premium</span></div>
+                <div className={`admin-menu-item ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => handleTabClick('coupons')}><span className="menu-icon"><i className="fi fi-br-ticket"></i></span><span>Mã Giảm Giá</span></div>
+                <div className={`admin-menu-item ${activeTab === 'activity_logs' ? 'active' : ''}`} onClick={() => handleTabClick('activity_logs')}><span className="menu-icon"><i className="fi fi-br-list"></i></span><span>Nhật ký Hoạt động</span></div>
+                <div className={`admin-menu-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => handleTabClick('settings')}><span className="menu-icon"><i className="fi fi-br-settings"></i></span><span>Cài Đặt</span></div>
+                <div className={`admin-menu-item ${activeTab === 'feedbacks' ? 'active' : ''}`} onClick={() => handleTabClick('feedbacks')}><span className="menu-icon"><i className="fi fi-br-envelope"></i></span><span>Góp Ý</span></div>
+                <div className={`admin-menu-item ${activeTab === 'newsletter' ? 'active' : ''}`} onClick={() => handleTabClick('newsletter')}><span className="menu-icon"><i className="fi fi-br-envelope"></i></span><span>Gửi Email</span></div>
 
-                <div className='admin-menu-item btn-home' onClick={() => navigate('/')}><span className="menu-icon">🚪</span><span>Rời trang</span></div>
+                <div className='admin-menu-item btn-home' onClick={() => navigate('/')}><span className="menu-icon"><i className="fi fi-br-exit"></i></span><span>Rời trang</span></div>
             </div>
 
             {/* MAIN CONTENT */}
@@ -1180,7 +1179,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Tổng quan hệ thống</h1>
                                 </div>
                                 {isErrorApp ? (
@@ -1189,13 +1188,13 @@ const AdminPage = () => {
                                     </div>
                                 ) : (
                                     <div className="system-status">
-                                        <Scale className="system-status-icon" />
+                                        <i className="system-status-icon fi fi-br-shield-check"></i>
                                         <span>Hệ thống hoạt động ổn định</span>
                                     </div>
                                 )}
                             </div>
                             <div className="dashboard-date-filter">
-                                <span className="dashboard-date-label">📅 Xem:</span>
+                                <span className="dashboard-date-label"><i className="fi fi-br-calendar"></i> Xem:</span>
                                 <select value={dashboardMonth} onChange={(e) => setDashboardMonth(e.target.value)} className="dashboard-date-select">
                                     <option value="all">Cả năm</option>
                                     {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>)}
@@ -1211,10 +1210,10 @@ const AdminPage = () => {
                                 title="USER ĐANG HOẠT ĐỘNG"
                                 value={userList.filter(u => u.is_verified === true || u.is_verified === 1).length}
                                 color="#0984e3"
-                                icon="👤"
+                                icon={<i className="fi fi-br-user"></i>}
                             />
-                            <Card title="TỔNG CÔNG THỨC" value={stats.recipes || 0} color="#00b894" icon="🍲" />
-                            <Card title={dashboardMonth === 'all' ? `DOANH THU NĂM ${dashboardYear}` : `DOANH THU THÁNG ${dashboardMonth}`} value={formatCurrency(monthlyRevenue.reduce((acc, curr) => acc + curr.revenue, 0))} color="#ff9f1c" icon="💰" />
+                            <Card title="TỔNG CÔNG THỨC" value={stats.recipes || 0} color="#00b894" icon={<i className="fi fi-br-book-alt"></i>} />
+                            <Card title={dashboardMonth === 'all' ? `DOANH THU NĂM ${dashboardYear}` : `DOANH THU THÁNG ${dashboardMonth}`} value={formatCurrency(monthlyRevenue.reduce((acc, curr) => acc + curr.revenue, 0))} color="#ff9f1c" icon={<i className="fi fi-br-wallet"></i>} />
                         </div>
 
                         <div className="admin-chart-box" style={{ marginBottom: '25px' }}>
@@ -1289,7 +1288,7 @@ const AdminPage = () => {
                         </div>
 
                         <div className="admin-chart-box" style={{ marginBottom: '25px', marginTop: '25px' }}>
-                            <h3 className="admin-chart-box-title">📊 Top Mã Được Sử Dụng Nhiều Nhất</h3>
+                            <h3 className="admin-chart-box-title"><i className="fi fi-br-chart-pie"></i> Top Mã Được Sử Dụng Nhiều Nhất</h3>
                             <div style={{ width: '100%', height: '300px' }}>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={couponList.map(c => ({ name: c.code, count: c.used_count || 0 }))}>
@@ -1353,7 +1352,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Cài đặt hệ thống</h1>
                                 </div>
                             </div>
@@ -1361,7 +1360,7 @@ const AdminPage = () => {
 
                         {/* --- KHỐI BẢO TRÌ --- */}
                         <div className="admin-chart-box" style={{ marginBottom: '25px' }}>
-                            <h3 className="admin-chart-box-title">🛠️ Chế độ bảo trì</h3>
+                            <h3 className="admin-chart-box-title"><i className="fi fi-br-settings"></i> Chế độ bảo trì</h3>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', background: '#f9fafc', padding: '20px', borderRadius: '15px', border: '1px solid #eee' }}>
                                 <div>
                                     <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', color: '#2d3436' }}>Trạng thái hệ thống</p>
@@ -1383,9 +1382,9 @@ const AdminPage = () => {
                         {/* --- KHỐI BANNER --- */}
                         <div className="admin-chart-box" style={{ marginBottom: '25px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
-                                <h3 className="admin-chart-box-title" style={{ margin: 0 }}>🖼️ Quản lý Banner Giao Diện Chính</h3>
+                                <h3 className="admin-chart-box-title" style={{ margin: 0 }}><i className="fi fi-br-folder"></i> Quản lý Banner Giao Diện Chính</h3>
                                 <button onClick={handleSaveRecipeBanner} className="btn-primary-admin" style={{ padding: '10px 25px' }}>
-                                    💾 Lưu thay đổi
+                                    <i className="fi fi-br-check"></i> Lưu thay đổi
                                 </button>
                             </div>
 
@@ -1407,7 +1406,7 @@ const AdminPage = () => {
                                         style={{ background: '#ff9f1c', boxShadow: 'none' }}
                                         disabled={!croppedFile}
                                     >
-                                        ☁️ Tải lên & Thêm
+                                        <i className="fi fi-br-cloud-upload"></i> Tải lên & Thêm
                                     </button>
                                 </div>
 
@@ -1428,7 +1427,7 @@ const AdminPage = () => {
 
                             {(!recipeBanner.banners || recipeBanner.banners.length === 0) ? (
                                 <div className="empty-state" style={{ padding: '40px 20px', textAlign: 'center', background: '#f9fafc', borderRadius: '15px', border: '1px dashed #dfe6e9', color: '#a4b0be' }}>
-                                    <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>🏞️</span>
+                                    <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}><i className="fi fi-br-folder"></i></span>
                                     Chưa có banner nào. Hãy chọn ảnh và tải lên ở khung phía trên!
                                 </div>
                             ) : (
@@ -1451,7 +1450,7 @@ const AdminPage = () => {
                                                 }}
                                                 title="Xóa banner này"
                                             >
-                                                ✕
+                                                <i className="fi fi-br-x"></i>
                                             </button>
 
                                             {/* Hình ảnh */}
@@ -1464,7 +1463,7 @@ const AdminPage = () => {
                                             {/* Khu vực nhập Link */}
                                             <div style={{ padding: '15px', background: '#f9fafc', flex: 1 }}>
                                                 <label style={{ fontSize: '13px', color: '#636e72', display: 'block', marginBottom: '5px', fontWeight: '600' }}>
-                                                    🔗 Link chuyển hướng:
+                                                    Link chuyển hướng:
                                                 </label>
                                                 <input
                                                     type="text"
@@ -1500,9 +1499,9 @@ const AdminPage = () => {
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
                                         <h3 style={{ margin: 0, fontSize: '20px', color: '#2d3436' }}>
-                                            ✂️ {cropTarget.type === 'category' ? 'Cắt ảnh Danh mục' : 'Cắt ảnh Banner'} (Tỷ lệ 16:9)
+                                            <i className="fi fi-br-edit"></i> {cropTarget.type === 'category' ? 'Cắt ảnh Danh mục' : 'Cắt ảnh Banner'} (Tỷ lệ 16:9)
                                         </h3>
-                                        <button onClick={closeCropModal} style={{ border: 'none', background: '#f1f2f6', color: '#636e72', width: '35px', height: '35px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                                        <button onClick={closeCropModal} style={{ border: 'none', background: '#f1f2f6', color: '#636e72', width: '35px', height: '35px', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="fi fi-br-x"></i></button>
                                     </div>
 
                                     <div style={{ display: 'flex', justifyContent: 'center', background: '#f1f2f6', borderRadius: '15px', padding: '15px', marginBottom: '25px', minHeight: '300px' }}>
@@ -1519,7 +1518,7 @@ const AdminPage = () => {
 
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px' }}>
                                         <button onClick={closeCropModal} className="btn-secondary" style={{ padding: '10px 20px', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Hủy bỏ</button>
-                                        <button onClick={handleConfirmCrop} className="btn-primary-admin" style={{ borderRadius: '10px' }}>✂️ Chốt & Cắt ảnh</button>
+                                        <button onClick={handleConfirmCrop} className="btn-primary-admin" style={{ borderRadius: '10px' }}><i className="fi fi-br-edit"></i> Chốt & Cắt ảnh</button>
                                     </div>
                                 </div>
                             </div>
@@ -1533,7 +1532,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Báo cáo người dùng vi phạm</h1>
                                 </div>
                             </div>
@@ -1618,7 +1617,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Báo cáo công thức vi phạm</h1>
                                 </div>
                             </div>
@@ -1703,7 +1702,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Quản lý người dùng ({userList.length})</h1>
                                 </div>
                             </div>
@@ -1712,7 +1711,7 @@ const AdminPage = () => {
                         <div className="admin-filter-row">
                             <div className="admin-search-wrapper">
                                 <input type="text" placeholder="Tìm tên, username, email..." value={userFilter.search} onChange={(e) => setUserFilter(prev => ({ ...prev, search: e.target.value }))} className="admin-search-input" />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
                             <select value={userFilter.premium} onChange={(e) => setUserFilter(prev => ({ ...prev, premium: e.target.value }))} className="admin-filter-select">
                                 <option value="all">Tất cả gói</option><option value="premium">VIP</option><option value="free">Free</option>
@@ -1740,15 +1739,15 @@ const AdminPage = () => {
                                             <td>{u.email} <br /><small className="admin-text-muted">@{u.username || 'user'}</small></td>
                                             <td><span className={`admin-badge ${u.role === 'admin' ? 'warning' : 'secondary'}`}>{u.role ? u.role.toUpperCase() : 'USER'}</span></td>
 
-                                            <td><span className={`admin-badge ${u.is_premium ? 'vip' : 'free'}`}>{u.is_premium ? '👑 VIP' : 'Free'}</span></td>
+                                            <td><span className={`admin-badge ${u.is_premium ? 'vip' : 'free'}`}>{u.is_premium ? <><i className="fi fi-br-crown"></i> VIP</> : 'Free'}</span></td>
                                             <td><span className={`admin-badge ${u.is_verified ? 'success' : 'danger'}`}>{u.is_verified ? '• Active' : '• Locked'}</span></td>
                                             <td>
                                                 {u.role !== 'admin' && (
                                                     <div className="admin-action-row">
-                                                        <button onClick={() => { setUserToDelete(u); setIsDeleteUserModalOpen(true); }} className="btn btn-delete" title="Xóa">🗑️</button>
-                                                        <button onClick={() => openResetPassModal(u)} className="btn btn-secondary" title="Reset MK">🔑</button>
-                                                        <button onClick={() => handleTogglePremium(u)} className={`btn ${u.is_premium ? 'btn-danger' : 'btn-warning'}`} title="VIP">{u.is_premium ? '⇩' : '👑'}</button>
-                                                        <button onClick={() => { setUserToToggleVerify(u); setIsVerifyModalOpen(true); }} className={`btn ${u.is_verified ? 'btn-secondary' : 'btn-success'}`} title="Khóa">{u.is_verified ? '🔒' : '🔓'}</button>
+                                                        <button onClick={() => { setUserToDelete(u); setIsDeleteUserModalOpen(true); }} className="btn btn-delete" title="Xóa"><i className="fi fi-br-trash"></i></button>
+                                                        <button onClick={() => openResetPassModal(u)} className="btn btn-secondary" title="Reset MK"><i className="fi fi-br-key"></i></button>
+                                                        <button onClick={() => handleTogglePremium(u)} className={`btn ${u.is_premium ? 'btn-danger' : 'btn-warning'}`} title="VIP"><i className="fi fi-br-crown"></i></button>
+                                                        <button onClick={() => { setUserToToggleVerify(u); setIsVerifyModalOpen(true); }} className={`btn ${u.is_verified ? 'btn-secondary' : 'btn-success'}`} title="Khóa"><i className="fi fi-br-lock"></i></button>
                                                     </div>
                                                 )}
                                             </td>
@@ -1772,7 +1771,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-bowl-hot"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Quản lý Công Thức ({recipes.length})</h1>
                                 </div>
                             </div>
@@ -1791,7 +1790,7 @@ const AdminPage = () => {
                         <div className="admin-filter-row">
                             <div className="admin-search-wrapper">
                                 <input type="text" placeholder="Tìm tên công thức, tác giả..." value={recipeFilter.search} onChange={(e) => setRecipeFilter(prev => ({ ...prev, search: e.target.value }))} className="admin-search-input" />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
                             <select value={recipeFilter.type} onChange={(e) => setRecipeFilter(prev => ({ ...prev, type: e.target.value }))} className="admin-filter-select">
                                 <option value="all">Tất cả thể loại</option><option value="free">Miễn phí</option><option value="premium">Premium</option>
@@ -1831,7 +1830,7 @@ const AdminPage = () => {
                                                 <div>{formatRecipeClassification(r.meal_type, mealTypeLabelMap)}</div>
                                             </td>
                                             <td className="admin-text-muted">{new Date(r.created_at).toLocaleDateString('vi-VN')}</td>
-                                            <td><span className={`admin-badge ${r.is_premium === 1 ? 'vip' : 'free'}`}>{r.is_premium === 1 ? '👑 PREMIUM' : 'Free'}</span></td>
+                                            <td><span className={`admin-badge ${r.is_premium === 1 ? 'vip' : 'free'}`}>{r.is_premium === 1 ? <><i className="fi fi-br-crown"></i> PREMIUM</> : 'Free'}</span></td>
                                             <td>
                                                 <div className="admin-action-row">
                                                     <button onClick={() => openRecipeDetails(r)} className="btn btn-outline">Xem</button>
@@ -1857,7 +1856,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Quản lý Danh Mục Món</h1>
                                 </div>
                             </div>
@@ -1943,7 +1942,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className='page-title' style={{ margin: 0 }}>Quản lý Phân Loại Món</h1>
                                 </div>
                             </div>
@@ -1994,7 +1993,7 @@ const AdminPage = () => {
                     <div className="fadeIn">
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
-                                <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                 <h1 className='page-title' style={{ margin: 0 }}>Quản lý Cộng Đồng ({communityPosts.length})</h1>
                             </div>
                         </div>
@@ -2033,7 +2032,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className="page-title" style={{ margin: 0 }}>Lịch sử giao dịch</h1>
                                 </div>
                             </div>
@@ -2042,7 +2041,7 @@ const AdminPage = () => {
                         <div className="admin-filter-row">
                             <div className="admin-search-wrapper">
                                 <input type="text" placeholder="Tìm mã GD, tên, email..." value={paymentFilter.search} onChange={(e) => setPaymentFilter(prev => ({ ...prev, search: e.target.value }))} className="admin-search-input" />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
                             <select value={paymentFilter.status} onChange={(e) => setPaymentFilter(prev => ({ ...prev, status: e.target.value }))} className="admin-filter-select">
                                 <option value="all">Tất cả trạng thái</option><option value="success">Thành công</option><option value="pending">Đang chờ</option><option value="refunded">Hoàn tiền/Thất bại</option>
@@ -2088,7 +2087,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className="page-title" style={{ margin: 0 }}>Gói Premium</h1>
                                 </div>
                             </div>
@@ -2097,7 +2096,7 @@ const AdminPage = () => {
                         <div className="admin-filter-row">
                             <div className="admin-search-wrapper">
                                 <input type="text" placeholder="Tìm gói..." value={packageFilter.search} onChange={(e) => setPackageFilter(prev => ({ ...prev, search: e.target.value }))} className="admin-search-input" />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
                             <select value={packageFilter.sortBy} onChange={(e) => setPackageFilter(prev => ({ ...prev, sortBy: e.target.value }))} className="admin-filter-select">
                                 <option value="newest">Mới nhất</option><option value="price_desc">Giá (Cao ➔ Thấp)</option><option value="price_asc">Giá (Thấp ➔ Cao)</option>
@@ -2114,10 +2113,10 @@ const AdminPage = () => {
                                         style={{ cursor: 'pointer' }}
                                     >
                                         <div className="admin-action-row" style={{ position: 'absolute', top: 15, right: 15 }}>
-                                            <button onClick={(e) => { e.stopPropagation(); openEditPackageModal(pkg); }} className="btn-icon btn-secondary" title="Sửa">✏️</button>
-                                            <button onClick={(e) => { e.stopPropagation(); setPkgToDelete(pkg); setIsConfirmDeleteOpen(true); }} className="btn-icon btn-danger" title="Xóa">🗑️</button>
+                                            <button onClick={(e) => { e.stopPropagation(); openEditPackageModal(pkg); }} className="btn-icon btn-secondary" title="Sửa"><i className="fi fi-br-edit"></i></button>
+                                            <button onClick={(e) => { e.stopPropagation(); setPkgToDelete(pkg); setIsConfirmDeleteOpen(true); }} className="btn-icon btn-danger" title="Xóa"><i className="fi fi-br-trash"></i></button>
                                         </div>
-                                        <div className="pkg-icon-box">{pkg.duration_days >= 365 ? '👑' : '💎'}</div>
+                                        <div className="pkg-icon-box">{pkg.duration_days >= 365 ? <i className="fi fi-br-crown"></i> : <i className="fi fi-br-diamond"></i>}</div>
                                         <h3>{pkg.name}</h3>
                                         <div className="pkg-price">{formatCurrency(pkg.price)}</div>
                                         <span className="pkg-duration">{pkg.duration_days} ngày</span>
@@ -2141,7 +2140,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className="page-title" style={{ margin: 0 }}>Quản lý Mã Giảm Giá</h1>
                                 </div>
                             </div>
@@ -2150,10 +2149,10 @@ const AdminPage = () => {
                         <div className="admin-filter-row">
                             <div className="admin-search-wrapper">
                                 <input type="text" placeholder="Tìm theo mã code..." value={couponFilter.search} onChange={(e) => setCouponFilter(prev => ({ ...prev, search: e.target.value }))} className="admin-search-input" />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
                             <select value={couponFilter.status} onChange={(e) => setCouponFilter(prev => ({ ...prev, status: e.target.value }))} className="admin-filter-select">
-                                <option value="all">Tất cả trạng thái</option><option value="active">🟢 Đang hoạt động</option><option value="inactive">⚫ Đang tắt</option>
+                                <option value="all">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Đang tắt</option>
                             </select>
                             <select value={couponFilter.sortBy} onChange={(e) => setCouponFilter(prev => ({ ...prev, sortBy: e.target.value }))} className="admin-filter-select">
                                 <option value="newest">Mới nhất</option><option value="used_desc">Lượt dùng (Cao ➔ Thấp)</option><option value="percent_desc">Giảm giá (Cao ➔ Thấp)</option>
@@ -2169,12 +2168,12 @@ const AdminPage = () => {
                                             <td><span onClick={() => copyToClipboard(`${c.code}`)} className="coupon-code-badge">{c.code}</span></td>
                                             <td className="admin-text-danger">-{c.percent}%</td>
                                             <td><b>{c.used_count || 0}</b> <span className="admin-text-muted">lượt</span></td>
-                                            <td><span onClick={() => handleToggleCouponStatus(c)} className={`admin-badge ${c.is_active ? 'solid-success' : 'solid-secondary'} admin-pointer`}>{c.is_active ? '🟢 Đang bật' : '⚫ Đã tắt'}</span></td>
+                                            <td><span onClick={() => handleToggleCouponStatus(c)} className={`admin-badge ${c.is_active ? 'solid-success' : 'solid-secondary'} admin-pointer`}>{c.is_active ? <><i className="fi fi-br-check"></i> Đang bật</> : <><i className="fi fi-br-x"></i> Đã tắt</>}</span></td>
                                             <td>{c.expiry_date ? formatDate(c.expiry_date).split(' ')[1] : 'Vô thời hạn'}</td>
                                             <td>
                                                 <div className="admin-action-row">
-                                                    <button onClick={() => openEditCouponModal(c)} className="btn btn-secondary">✏️</button>
-                                                    <button onClick={() => { setCouponToDelete(c); setIsDeleteCouponModalOpen(true); }} className="btn btn-delete">Xóa</button>
+                                                    <button onClick={() => openEditCouponModal(c)} className="btn btn-secondary"><i className="fi fi-br-edit"></i></button>
+                                                    <button onClick={() => { setCouponToDelete(c); setIsDeleteCouponModalOpen(true); }} className="btn btn-delete"><i className="fi fi-br-trash"></i></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2196,7 +2195,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className="page-title" style={{ margin: 0 }}>Nhật ký hoạt động</h1>
                                 </div>
                             </div>
@@ -2214,7 +2213,7 @@ const AdminPage = () => {
                                     onChange={(e) => setActivityLogFilter(prev => ({ ...prev, search: e.target.value }))}
                                     className="admin-search-input"
                                 />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
 
                             {/* 2. Lọc theo loại hành động */}
@@ -2311,7 +2310,7 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
                                     <h1 className="page-title" style={{ margin: 0 }}>Góp ý từ người dùng</h1>
                                 </div>
                             </div>
@@ -2320,7 +2319,7 @@ const AdminPage = () => {
                         <div className="admin-filter-row" >
                             <div className="admin-search-wrapper">
                                 <input type="text" placeholder="Tìm tên, email..." value={feedbackFilter.search} onChange={(e) => setFeedbackFilter(prev => ({ ...prev, search: e.target.value }))} className="admin-search-input" />
-                                <span className="admin-search-icon">🔍</span>
+                                <span className="admin-search-icon"><i className="fi fi-br-search"></i></span>
                             </div>
                             <select value={feedbackFilter.type} onChange={(e) => setFeedbackFilter(prev => ({ ...prev, type: e.target.value }))} className="admin-filter-select">
                                 <option value="all">Tất cả thể loại</option><option value="feature">Tính năng</option><option value="ui">Giao diện</option><option value="bug">Lỗi</option>
@@ -2359,8 +2358,8 @@ const AdminPage = () => {
                         <div className="admin-header-row">
                             <div className="header-mobile-wrapper">
                                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}>☰</button>
-                                    <h1 className='page-title'>Chiến Dịch Email 🚀</h1>
+                                    <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(true)}><i className="fi fi-br-menu-burger"></i></button>
+                                    <h1 className='page-title'>Chiến Dịch Email</h1>
                                 </div>
                             </div>
                         </div>
@@ -2385,7 +2384,7 @@ const AdminPage = () => {
                             ></textarea>
 
                             <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px', color: '#666', border: '1px dashed #ccc' }}>
-                                💡 <b>Mẹo:</b> Hệ thống đã tự động bao bọc bức thư bằng một khung viền đẹp, chèn logo EatDish lên trên cùng và gắn nút "Hủy đăng ký" ở dưới cùng. Bạn chỉ cần nhập đúng phần nội dung cốt lõi của bức thư thôi nhé!
+                                <i className="fi fi-br-settings"></i> <b>Mẹo:</b> Hệ thống đã tự động bao bọc bức thư bằng một khung viền đẹp, chèn logo EatDish lên trên cùng và gắn nút "Hủy đăng ký" ở dưới cùng. Bạn chỉ cần nhập đúng phần nội dung cốt lõi của bức thư thôi nhé!
                             </div>
 
                             <button
@@ -2398,7 +2397,7 @@ const AdminPage = () => {
                                     transition: '0.3s'
                                 }}
                             >
-                                {isSendingNewsletter ? 'Đang gửi tên lửa đi... 🚀' : 'Phát Sóng Hàng Loạt 📢'}
+                                {isSendingNewsletter ? 'Đang gửi...' : 'Phát Sóng Hàng Loạt'}
                             </button>
                         </div>
                     </div>
@@ -2423,7 +2422,7 @@ const AdminPage = () => {
             <ConfirmModal isOpen={isDeleteUserModalOpen} onClose={() => setIsDeleteUserModalOpen(false)} onConfirm={confirmDeleteUser} title="Xóa người dùng" message={userToDelete ? <>Xóa vĩnh viễn tài khoản <b>@{userToDelete.username}</b>?</> : ""} />
             <ConfirmModal isOpen={isDeleteFeedbackModalOpen} onClose={() => setIsDeleteFeedbackModalOpen(false)} onConfirm={confirmDeleteFeedback} title="Xóa góp ý" message="Bạn muốn xóa phản hồi này?" />
             <ConfirmModal isOpen={isResetPassModalOpen} onClose={() => setIsResetPassModalOpen(false)} onConfirm={confirmResetPass} title="Reset mật khẩu" message="Mật khẩu sẽ về mặc định: 123456" />
-            <ConfirmModal isOpen={isPremiumModalOpen} onClose={() => setIsPremiumModalOpen(false)} onConfirm={confirmTogglePremium} title={userToToggleVIP?.is_premium === 1 ? "Hủy VIP ❌" : "Cấp VIP 👑"} message={userToToggleVIP ? <>Thay đổi trạng thái Premium cho <b>{userToToggleVIP.fullname}</b>?</> : ""} />
+            <ConfirmModal isOpen={isPremiumModalOpen} onClose={() => setIsPremiumModalOpen(false)} onConfirm={confirmTogglePremium} title={userToToggleVIP?.is_premium === 1 ? <>Hủy VIP <i className="fi fi-br-x"></i></> : <>Cấp VIP <i className="fi fi-br-crown"></i></>} message={userToToggleVIP ? <>Thay đổi trạng thái Premium cho <b>{userToToggleVIP.fullname}</b>?</> : ""} />
             <ConfirmModal isOpen={isVerifyModalOpen} onClose={() => setIsVerifyModalOpen(false)} onConfirm={confirmToggleVerify} title={userToToggleVerify?.is_verified === 1 ? "Khóa tài khoản" : "Mở khóa tài khoản"} message="Người dùng bị khóa sẽ không thể đăng nhập." />
             <ConfirmModal isOpen={isDeletePostModalOpen} onClose={() => setIsDeletePostModalOpen(false)} onConfirm={confirmDeletePost} title="Xóa bài viết" message="Bạn có chắc chắn muốn xóa bài viết này khỏi cộng đồng?" />
             <ConfirmModal isOpen={isApprovePostModalOpen} onClose={() => setIsApprovePostModalOpen(false)} onConfirm={confirmApprovePost} title="Duyệt bài viết" message="Cho phép bài viết này hiển thị công khai trong cộng đồng?" />
@@ -2434,7 +2433,7 @@ const AdminPage = () => {
                 isOpen={isMaintenanceModalOpen}
                 onClose={() => setIsMaintenanceModalOpen(false)}
                 onConfirm={executeToggleMaintenance}
-                title={isMaintenance ? "Tắt Bảo Trì 🟢" : "Bật Bảo Trì 🛠️"}
+                title={isMaintenance ? <>Tắt Bảo Trì <i className="fi fi-br-check"></i></> : <>Bật Bảo Trì <i className="fi fi-br-settings"></i></>}
                 message={isMaintenance ? "Trang web sẽ hoạt động lại bình thường, mở cửa đón khách." : "Bật chế độ tu luyện? Khách hàng sẽ bị chuyển sang trang bảo trì, chỉ Admin mới vào được."}
             />
             <PackageDetailModal
@@ -2642,3 +2641,4 @@ const AdminPagination = ({ pagination, onPrev, onNext }) => (
 );
 
 export default AdminPage;
+

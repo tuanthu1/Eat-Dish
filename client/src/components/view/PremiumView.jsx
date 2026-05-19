@@ -28,7 +28,7 @@ const PremiumView = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const resPkgs = await axiosClient.get('/packages');
+                const resPkgs = await axiosClient.get('/premium/packages');
                 const pkgData = Array.isArray(resPkgs.data) ? resPkgs.data : [];
                 
                 if (pkgData.length > 0) {
@@ -39,7 +39,7 @@ const PremiumView = () => {
                     }
                 }
                 try {
-                    const resStatus = await axiosClient.get('/status');
+                    const resStatus = await axiosClient.get('/premium/status');
                     if (resStatus.data) {
                         setPremiumInfo({
                             isPremium: resStatus.data.is_premium == 1,
@@ -64,9 +64,25 @@ const PremiumView = () => {
     const safeParseBenefits = (benefits) => {
         try {
             if (!benefits) return [];
-            const parsed = typeof benefits === 'string' ? JSON.parse(benefits) : benefits;
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) { return []; }
+            // If it's already an array from API, return it
+            if (Array.isArray(benefits)) return benefits;
+            // If it's a JSON string, parse it
+            if (typeof benefits === 'string') {
+                const parsed = JSON.parse(benefits);
+                return Array.isArray(parsed) ? parsed : [];
+            }
+            return [];
+        } catch (e) { 
+            console.warn('Error parsing benefits:', e);
+            return []; 
+        }
+    };
+
+    const extractBenefitName = (benefit) => {
+        if (typeof benefit === 'string') return benefit;
+        if (!benefit || typeof benefit !== 'object') return '';
+        const name = benefit.name || benefit.description || benefit.id || '';
+        return String(name);
     };
 
     const handleSelectPackage = (pkg) => {
@@ -83,7 +99,9 @@ const PremiumView = () => {
             setAppliedDiscount({ percent: res.data.percent, code: res.data.code });
             toast.success(` ${res.data.message}`);
         } catch (err) {
-            toast.error(' Mã giảm giá không hợp lệ hoặc đã hết hạn');
+            console.error('check-coupon error', err);
+            const msg = err?.response?.data?.message || 'Mã giảm giá không hợp lệ hoặc đã hết hạn';
+            toast.error(msg);
         }
     };
 
@@ -146,10 +164,10 @@ const PremiumView = () => {
                             <h2 className="premium-left-title">Quyền lợi <span>{selectedPkg.name}</span></h2>
                             <p className="premium-left-desc">{selectedPkg.description || 'Nâng cấp để trải nghiệm tính năng đỉnh cao.'}</p>
                             <div className="premium-benefit-list">
-                                {safeParseBenefits(selectedPkg.benefits).map((benefit, i) => (
+                                {safeParseBenefits(selectedPkg?.benefits || []).map((benefit, i) => (
                                     <div key={i} className="premium-benefit-item">
                                         <div className="premium-benefit-icon"><SquareCheck fill='#00b894'/></div>
-                                        <div className="premium-benefit-text">{benefit}</div>
+                                        <div className="premium-benefit-text">{extractBenefitName(benefit)}</div>
                                     </div>
                                 ))}
                             </div>
@@ -188,10 +206,18 @@ const PremiumView = () => {
                     <div className="premium-coupon-wrapper">
                         <input 
                             type="text" placeholder="Mã giảm giá..." 
-                            value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            value={couponCode} onChange={(e) => {
+                                const nextCode = e.target.value.toUpperCase();
+                                setCouponCode(nextCode);
+                                if (appliedDiscount && appliedDiscount.code !== nextCode) {
+                                    setAppliedDiscount(null);
+                                }
+                            }}
                             className="premium-coupon-input"
                         />
-                        <button onClick={handleApplyCoupon} className="premium-coupon-btn">Áp dụng</button>
+                        {!appliedDiscount && (
+                            <button onClick={handleApplyCoupon} className="premium-coupon-btn">Áp dụng</button>
+                        )}
                     </div>
 
                     <div className="premium-total-section">

@@ -1,16 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import axiosClient from '../api/axiosClient';
 import '../index.css';
-import { Star } from 'lucide-react';
+import { Star, Trash2 } from 'lucide-react';
 
 const RecipeReviews = ({ recipeId, refreshKey = 0 }) => {
     const [reviews, setReviews] = useState([]);
+    const [currentUserId, setCurrentUserId] = useState(null);
+
+    useEffect(() => {
+        // Lấy thông tin người dùng hiện tại từ localStorage
+        const userStr = localStorage.getItem('user') || localStorage.getItem('eatdish_user');
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                setCurrentUserId(user.id);
+            } catch (e) {
+                console.log('Lỗi parse user từ localStorage:', e);
+            }
+        }
+    }, []);
 
     const fetchReviews = async () => {
         try {
             const res = await axiosClient.get(`/recipes/${recipeId}/reviews`);
             setReviews(res.data);
         } catch (e) { console.log(e); }
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này?')) {
+            return;
+        }
+
+        try {
+            await axiosClient.delete(`/recipes/reviews/${reviewId}`);
+            // Làm mới danh sách reviews
+            fetchReviews();
+        } catch (e) {
+            console.error('Lỗi xóa đánh giá:', e);
+            alert('Không thể xóa đánh giá. Vui lòng thử lại sau.');
+        }
     };
 
     useEffect(() => {
@@ -41,6 +70,28 @@ const RecipeReviews = ({ recipeId, refreshKey = 0 }) => {
                                 <Star key={i} size={16} fill={i < (rev.rating || 0) ? '#f1c40f' : 'none'} color={i < (rev.rating || 0) ? '#f1c40f' : '#ccc'} />
                             ))}</span>
                             <span className="review-rating-number">{Number(rev.rating || 0)}/5</span>
+                            {currentUserId && rev.user && rev.user._id === currentUserId && (
+                                <button 
+                                    onClick={() => handleDeleteReview(rev._id)}
+                                    className="review-delete-btn"
+                                    title="Xóa đánh giá"
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: '#e74c3c',
+                                        marginLeft: 'auto',
+                                        padding: '4px 8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    <Trash2 size={18} />
+                                    Xóa
+                                </button>
+                            )}
                         </div>
                         {rev.cooksnap_image && (
                             <img src={rev.cooksnap_image} alt="cooksnap" className="review-cooksnap-image" />

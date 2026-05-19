@@ -5,7 +5,9 @@ const packageSchema = new mongoose.Schema({
     price: { type: Number, required: true },
     duration_days: { type: Number, required: true },
     description: { type: String },
-    benefits: [{ type: String }], // Array thay vì JSON
+    level: { type: Number, default: 1 },
+    // Chứa các ID quyền lợi có thực từ premium_benefits trong SiteSetting
+    benefit_ids: [{ type: String }], // Tham chiếu đến benefit.id trong SiteSetting
     is_active: { type: Boolean, default: true }
 }, { timestamps: true });
 

@@ -2,6 +2,7 @@ import React from 'react';
 import axiosClient from '../../api/axiosClient';
 import { Camera } from 'lucide-react';
 import { toast } from 'react-toastify';
+import PremiumIcon from '../PremiumIcon';
 const CommunityView = ({ 
     user, postContent, setPostContent, imagePreview, setImagePreview, 
     postImage, setPostImage, handleFileChange, handleSubmitPost, 
@@ -92,9 +93,12 @@ const CommunityView = ({
                 <div key={postId} className="community-post-item">
                     <div className="community-post-header">
                         <div className="community-post-author">
-                            <img src={post.avatar || post.user?.avatar} onClick={() => handleViewProfile(postUserId)} className="community-author-avt" alt="avt" />
+                            <img src={post.avatar || post.user?.avatar} onClick={() => handleViewProfile(postUserId)} className={`community-author-avt ${post.author_is_premium ? 'premium-avatar' : ''}`} alt="avt" />
                             <div>
-                                <div onClick={() => handleViewProfile(postUserId)} className="community-author-name">{post.fullname || post.user?.fullname || post.user?.username}</div>
+                                <div onClick={() => handleViewProfile(postUserId)} className={`community-author-name ${post.author_is_premium ? 'premium-text' : ''}`}>
+                                    {post.fullname || post.user?.fullname || post.user?.username}
+                                    {post.author_is_premium && <span title="Thành viên VIP" style={{ marginLeft: '5px', display: 'inline-flex', alignItems: 'center' }}><PremiumIcon size={16} /></span>}
+                                </div>
                                 <div className="community-post-date">{new Date(post.created_at || post.createdAt).toLocaleDateString()}</div>
                             </div>
                         </div>

@@ -42,7 +42,7 @@ exports.handleWebhook = async (req, res) => {
                 return res.json({ success: true });
             }
 
-            if (payment.status === 'paid') {
+            if (payment.status === 'success') {
                 console.log(`Đơn ${orderCode} đã được xử lý trước đó`);
                 return res.json({ success: true });
             }
@@ -50,8 +50,22 @@ exports.handleWebhook = async (req, res) => {
             // Cập nhật trạng thái thanh toán
             await Payment.findOneAndUpdate(
                 { order_id: orderCode },
-                { status: 'paid' }
+                { status: 'success' }
             );
+
+            // Notify user
+            try {
+                const Notification = require('../models/Notification');
+                if (payment && payment.user) {
+                    await Notification.create({
+                        user: payment.user,
+                        message: `Giao dịch ${orderCode} đã thanh toán thành công.`,
+                        type: 'payment'
+                    });
+                }
+            } catch (notifErr) {
+                console.error('Lỗi tạo notification webhook:', notifErr);
+            }
 
             // Kích hoạt Premium cho User
             if (payment && payment.user) {

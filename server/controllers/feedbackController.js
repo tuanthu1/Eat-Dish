@@ -1,5 +1,7 @@
+const Notification = require('../models/Notification');
+const Feedback = require('../models/Feedback');
+const ActivityLog = require('../models/ActivityLogModel');
 
-const Feedback = require('../models/Feedback'); 
 // hàm tạo feedback gửi về cho admin
 exports.createFeedback = async (req, res) => { 
     const { userId, type, content } = req.body;
@@ -11,12 +13,17 @@ exports.createFeedback = async (req, res) => {
             content
         });
         await ActivityLog.create({
-            admin: req.user ? req.user.id : null,
-            action: "Tài khoản " + userId + " đã gửi một góp ý mới với nội dung: " + content.substring(0, 30) + "..."
+            username: req.user?.username || 'anonymous',
+            action: "Người dùng đã gửi một góp ý mới với nội dung: " + content.substring(0, 30) + "..."
         });
-        return res.status(200).json({ 
-            status: 'success', 
-            message: "Gửi góp ý thành công!" 
+        await Notification.create({
+            user: userId,
+            type: 'feedback',
+            message: `Cảm ơn bạn đã gửi góp ý! Chúng tôi sẽ xem xét và phản hồi sớm nhất có thể.`
+        });
+        return res.status(200).json({
+            status: 'success',
+            message: "Gửi góp ý thành công!"
         });
         
     } catch (err) {

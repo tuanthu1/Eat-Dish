@@ -235,6 +235,14 @@ body {
     padding: 0;
 }
 
+.stat-icon i {
+    font-size: 26px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .stat-value {
     font-size: 36px;
     font-weight: 600;
@@ -749,6 +757,7 @@ body {
 .btn-warning {
     background: #f1c40f;
     color: white;
+    text-wrap: nowrap;
 }
 
 .btn-danger {
@@ -759,6 +768,7 @@ body {
 .btn-success {
     background: #00b894;
     color: white;
+    text-wrap: nowrap;
 }
 
 .btn-outline {

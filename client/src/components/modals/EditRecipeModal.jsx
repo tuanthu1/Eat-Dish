@@ -50,7 +50,7 @@ const EditRecipeModal = ({ isOpen, onClose, user, editingRecipe, onUpdateSuccess
                 ingredients: safeParse(editingRecipe.ingredients),
                 steps: safeParse(editingRecipe.steps || editingRecipe.instructions),
                 image: null,
-                is_premium: editingRecipe.is_premium || editingRecipe.is_vip ? 1 : 0,
+                is_premium: Number(editingRecipe.premium_level ?? editingRecipe.is_premium ?? editingRecipe.is_vip ?? 0),
                 category: editingRecipe.category || 'Khac',
                 meal_type: editingRecipe.meal_type || 'Khong_xac_dinh'
             });
@@ -194,7 +194,7 @@ const EditRecipeModal = ({ isOpen, onClose, user, editingRecipe, onUpdateSuccess
             formData.append('meal_type', editData.meal_type || 'Khong_xac_dinh');
             formData.append('ingredients', JSON.stringify(editData.ingredients));
             formData.append('steps', JSON.stringify(editData.steps));
-            formData.append('is_premium', editData.is_premium ? 1 : 0);
+            formData.append('is_premium', editData.is_premium ?? 0);
             if (editData.image) formData.append('image', editData.image);
 
             const res = await axiosClient.post(`/recipes/${editingRecipe.id}?_method=PUT`, formData, {
@@ -373,7 +373,7 @@ const EditRecipeModal = ({ isOpen, onClose, user, editingRecipe, onUpdateSuccess
                         </div>
                     </div>
 
-                    {user?.is_premium === 1 && (
+                    {(((user?.is_premium === 1) || (user?.is_premium === '1') || (user?.is_premium === true)) || (user?.role === 'admin')) && (
                         <div style={{ 
                             margin: '15px 0', 
                             padding: '10px', 
@@ -381,14 +381,16 @@ const EditRecipeModal = ({ isOpen, onClose, user, editingRecipe, onUpdateSuccess
                             borderRadius: '8px',
                             border: '1px dashed #ff9f1c'
                         }}>
-                            <label style={{ cursor: 'pointer', fontWeight: 'bold', color: '#d35400', display: 'flex', alignItems: 'center' }}>
-                                <input 
-                                    type="checkbox" 
-                                    checked={editData.is_premium === 1}
-                                    onChange={(e) => setEditData({...editData, is_premium: e.target.checked ? 1 : 0})}
-                                    style={{ marginRight: '10px', transform: 'scale(1.3)' }}
-                                />
-                                <Crown /> Đăng làm công thức Premium (Không hiện quảng cáo)
+                            <label style={{ cursor: 'pointer', fontWeight: 'bold', color: '#d35400', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <Crown /> Premium
+                                <select
+                                    value={editData.is_premium ?? 0}
+                                    onChange={(e) => setEditData({ ...editData, is_premium: Number(e.target.value) })}
+                                    style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #ff9f1c', background: '#fff', fontWeight: 700 }}
+                                >
+                                    <option value={0}>Không</option>
+                                    <option value={1}>Có</option>
+                                </select>
                             </label>
                         </div>
                     )}

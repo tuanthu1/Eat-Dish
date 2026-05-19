@@ -4,30 +4,40 @@ const User = require('../models/UserModel');
 const ActivityLog = require('../models/ActivityLogModel');
 const SearchAnalytics = require('../models/SearchAnalyticsModel');
 const SiteSetting = require('../models/SiteSetting');
+const Notification = require('../models/Notification');
+const RecipeReport = require('../models/RecipeReportModel');
 const jwt = require('jsonwebtoken');
 const Groq = require('groq-sdk');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-
+// lấy các kí tự đặc biệt ra khỏi chuỗi để tránh lỗi regex hoặc lỗi SQL injection.
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
+// ép chuỗi về số nguyên, nếu không parse được thì trả về null
 const parseNumber = (value) => {
     if (value === undefined || value === null || value === '') return null;
     const parsed = Number.parseInt(String(value), 10);
     return Number.isNaN(parsed) ? null : parsed;
 };
-
+// ép chuỗi về thời gian, nếu không parse được thì trả về 0 (để tránh lỗi khi lưu vào DB, vì trường time không bắt buộc phải có)
 const parseTimeValue = (value) => {
     if (value === undefined || value === null || value === '') return 0;
     const match = String(value).match(/\d+/);
     return match ? Number.parseInt(match[0], 10) : 0;
 };
-
+// hàm bình thường hoá giá trị phân loại món ăn (category, meal_type), 
+// nếu không có hoặc rỗng thì trả về fallback (thường là 'Khac' hoặc 'Khong_xac_dinh')
 const normalizeRecipeClassification = (value, fallback) => {
     if (value === undefined || value === null) return fallback;
     const trimmed = String(value).trim();
     return trimmed || fallback;
+};
+
+const getPremiumLevel = (value) => {
+    if (value === true || value === 'true') return 1;
+    if (value === false || value === 'false' || value === null || value === undefined || value === '') return 0;
+    const parsed = Number.parseInt(String(value), 10);
+    return Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
 };
 
 const DEFAULT_CATEGORY_LABELS = {
@@ -62,7 +72,8 @@ const buildLabelMap = (items = []) => {
         return acc;
     }, {});
 };
-
+// hàm lấy bản đồ label cho category và meal_type từ SiteSetting, 
+// kết hợp với mặc định để đảm bảo luôn có label cho mọi giá trị phân loại
 const getRecipeClassificationLabelMaps = async () => {
     const setting = await SiteSetting.findOne({ key: 'recipe_classifications' }).select('value');
     const categories = setting?.value?.categories || [];
@@ -95,7 +106,7 @@ exports.getAllRecipes = async (req, res) => {
 
         // 2. Tìm trong Database
         let recipes = await Recipe.find(filter)
-            .populate('author', '_id fullname avatar') // Lấy thông tin tác giả
+            .populate('author', '_id fullname avatar is_premium') // Lấy thông tin tác giả
             .sort({ createdAt: -1 });
 
         // 3. Xử lý thông tin người dùng hiện tại (nếu có đăng nhập)
@@ -109,7 +120,8 @@ exports.getAllRecipes = async (req, res) => {
                 recipes = recipes.filter(r => !currentUser.blocked_users.includes(r.author?._id));
             }
         }
-        // thuật tooans đề xuất (TikTok style): Dựa vào lịch sử xem và sở thích của người dùng để đẩy những món ăn họ có khả năng thích lên đầu danh sách
+        // thuật tooans đề xuất (TikTok style):
+        //  Dựa vào lịch sử xem và sở thích của người dùng để đẩy những món ăn họ có khả năng thích lên đầu danh sách
         if(!keyword && prefs) {
             const preferredCategories = prefs.split(',').map(c => c.trim()).filter(c => c);
             const recommended = [];
@@ -127,12 +139,25 @@ exports.getAllRecipes = async (req, res) => {
                 const j = Math.floor(Math.random() * (i + 1));
                 [recommended[i], recommended[j]] = [recommended[j], recommended[i]];
             }
+            // ƯU TIÊN PREMIUM LÊN TOP - mức 1 là cao nhất
+            recommended.sort((a,b) => getPremiumLevel(a.is_premium) - getPremiumLevel(b.is_premium));
+            others.sort((a,b) => getPremiumLevel(a.is_premium) - getPremiumLevel(b.is_premium));
+            
             recipes = [...recommended, ...others];
+        } else {
+            // Không có prefs hoặc có keyword -> Ưu tiên premium level cao hơn lên đầu (1 là cao nhất)
+            recipes.sort((a,b) => {
+                const aPremium = getPremiumLevel(a.is_premium);
+                const bPremium = getPremiumLevel(b.is_premium);
+                if (aPremium !== bPremium) return aPremium - bPremium;
+                return new Date(b.createdAt) - new Date(a.createdAt);
+            });
         }
         // 4. Format lại data cho React đọc được
         const formattedRecipes = recipes.map(r => {
             const obj = r.toObject();
             obj.id = obj._id; // Gắn ID chuẩn
+            obj.premium_level = getPremiumLevel(obj.is_premium);
             
             // Check xem món này đã được tim chưa (dùng optional chaining ?.)
             obj.is_favorite = currentUser?.favorites?.includes(obj._id) || false;
@@ -142,6 +167,7 @@ exports.getAllRecipes = async (req, res) => {
                 obj.user_id = obj.author._id;
                 obj.fullname = obj.author.fullname;
                 obj.avatar = obj.author.avatar;
+                obj.author_is_premium = obj.author.is_premium;
             }
 
             obj.category_label = categoryLabelMap[obj.category] || humanizeClassification(obj.category, 'Khác');
@@ -151,7 +177,7 @@ exports.getAllRecipes = async (req, res) => {
 
         res.json(formattedRecipes);
     } catch (error) {
-        console.error("❌ Lỗi getAllRecipes:", error);
+        console.error("Lỗi getAllRecipes:", error);
         res.status(500).json({ message: "Lỗi server khi lấy món ăn", error: error.message });
     }
 };
@@ -222,30 +248,40 @@ exports.createRecipe = async (req, res) => {
     try {
        const { name, userId, description, calories, time, ingredients, steps, video_url, category, meal_type, is_premium } = req.body;
         const normalizedTime = parseTimeValue(time);
-        
+
         const imgUrl = req.file ? req.file.path : null;
 
         if (!name || !userId || !imgUrl) {
             return res.status(400).json({ message: "Thiếu thông tin cần thiết" });
         }
-        
+
+        // Ensure calories is stored as a Number. Clients sometimes send strings like "2165 calo".
+        const cleanCalories = (calories !== undefined && calories !== null)
+            ? parseInt(String(calories).replace(/[^0-9]/g, ''), 10) || 0
+            : 0;
+
         await Recipe.create({
-            name, 
-            author: userId, 
-            description: description || '', 
+            name,
+            author: userId,
+            description: description || '',
             category: normalizeRecipeClassification(category, 'Khac'),
             meal_type: normalizeRecipeClassification(meal_type, 'Khong_xac_dinh'),
-            calories, 
-            time: String(normalizedTime), 
-            img: imgUrl, 
-            ingredients, 
+            calories: cleanCalories,
+            time: String(normalizedTime),
+            img: imgUrl,
+            ingredients,
             steps,
             video_url: video_url || '',
-            is_premium: (is_premium == 1 || is_premium === '1') ? true : false 
+            is_premium: getPremiumLevel(is_premium)
         });
         await ActivityLog.create({
             admin: req.user ? req.user.id : null,
             action: "Tài khoản " + userId + " đã gửi một công thức mới chờ duyệt với tên: " + name
+        });
+        await Notification.create({
+            user: userId,
+            type: 'recipe_submission',
+            message: `Cảm ơn bạn đã gửi công thức "${name}"! Công thức của bạn đã được đăng, nếu công thức của bạn vi phạm quy định, nó sẽ bị loại bỏ.`
         });
         res.json({ success: true, message: "Đã gửi công thức chờ duyệt!" });
     } catch (err) {
@@ -291,17 +327,12 @@ exports.updateRecipe = async (req, res) => {
             video_url,
             category: normalizeRecipeClassification(category, 'Khac'),
             meal_type: normalizeRecipeClassification(meal_type, 'Khong_xac_dinh'),
-            is_premium: (is_premium === '1' || is_premium === 1 || is_premium === 'true' || is_premium === true)
+            is_premium: getPremiumLevel(is_premium)
         };
         if (req.file) updateData.img = req.file.path;
 
-        // 4. LƯU VÀ LẤY VỀ DATA MỚI NHẤT (Chìa khóa là {new: true})
-        const updatedRecipe = await Recipe.findByIdAndUpdate(recipeId, updateData, { new: true }).populate('author', '_id fullname avatar');
-        
-        await ActivityLog.create({
-            admin: req.user ? req.user.id : null,
-            action: "Tài khoản " + userId + " đã cập nhật công thức: " + name
-        });
+        // 4. LƯU VÀ LẤY VỀ DATA MỚI NHẤT (Chìa khóa là {returnDocument: 'after'})
+        const updatedRecipe = await Recipe.findByIdAndUpdate(recipeId, updateData, { returnDocument: 'after' }).populate('author', '_id fullname avatar');
 
         const formattedRecipe = updatedRecipe.toObject();
         formattedRecipe.id = formattedRecipe._id;
@@ -343,7 +374,18 @@ exports.toggleFavorite = async (req, res) => {
             await User.findByIdAndUpdate(userId, {
                 $addToSet: { favorites: recipeId }
             });
-            res.json({ status: 'favorited', message: "Đã thêm vào yêu thích" });
+                // Notify recipe author
+                try {
+                    const recipe = await Recipe.findById(recipeId).select('author name');
+                    if (recipe && recipe.author && String(recipe.author) !== String(userId)) {
+                        const userData = await User.findById(userId).select('fullname');
+                        const msg = `${userData?.fullname || 'Ai đó'} đã thích công thức ${recipe.name || ''} của bạn.`;
+                        await Notification.create({ user: recipe.author, message: msg, type: 'favorite' });
+                    }
+                } catch (notifErr) {
+                    console.error('Lỗi tạo Notification khi favorited:', notifErr);
+                }
+                res.json({ status: 'favorited', message: "Đã thêm vào yêu thích" });
         }
     } catch (err) {
         console.error(err);
@@ -368,7 +410,6 @@ exports.getUserFavorites = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
-
 // Lấy chi tiết 1 món
 exports.getRecipeById = async (req, res) => {
     try {
@@ -398,7 +439,7 @@ exports.getRecipeById = async (req, res) => {
         const totalLikes = await User.countDocuments({ favorites: id });
         formattedRecipe.favorites_count = totalLikes;
 
-        // --- BẮT ĐẦU ĐOẠN LOGIC TÍNH TOP TÌM KIẾM ---
+        //  BẮT ĐẦU ĐOẠN LOGIC TÍNH TOP TÌM KIẾM 
         const SearchAnalytics = require('../models/SearchAnalyticsModel');
         // Tìm xem món này đang hot nhất với từ khóa nào
         const topSearch = await SearchAnalytics.findOne({ recipe: id }).sort({ clicks: -1 });
@@ -422,7 +463,7 @@ exports.getRecipeById = async (req, res) => {
 
         res.json(formattedRecipe);
     } catch (err) {
-        console.error("❌ Lỗi getRecipeById:", err);
+        console.error("Lỗi getRecipeById:", err);
         res.status(500).json({ message: "Lỗi server khi tải công thức" });
     }
 };
@@ -441,7 +482,7 @@ exports.searchRecipes = async (req, res) => {
         if (maxTime) query.time = { $lte: parseInt(maxTime) };
 
         let recipes = await Recipe.find(query)
-            .populate('author', 'fullname avatar')
+            .populate('author', 'fullname avatar is_premium')
             .limit(20);
 
         // --- BẮT ĐẦU THUẬT TOÁN ĐẨY TOP TÌM KIẾM LÊN ĐẦU ---
@@ -460,12 +501,19 @@ exports.searchRecipes = async (req, res) => {
             const formattedRecipes = recipes.map(r => {
                 const obj = r.toObject();
                 obj.id = obj._id;
-                if (obj.author) obj.user_id = obj.author._id;
+                if (obj.author) {
+                    obj.user_id = obj.author._id;
+                    obj.author_is_premium = obj.author.is_premium;
+                }
                 return obj;
             });
 
             // 4. Bơm logic sắp xếp: Ai có lượt Click (Rank) cao hơn thì chễm chệ ngồi trên!
             formattedRecipes.sort((a, b) => {
+                const aPremium = getPremiumLevel(a.is_premium);
+                const bPremium = getPremiumLevel(b.is_premium);
+                if (aPremium !== bPremium) return aPremium - bPremium; // mức 1 là cao nhất
+                
                 const clicksA = clickMap[a._id.toString()] || 0;
                 const clicksB = clickMap[b._id.toString()] || 0;
                 
@@ -478,10 +526,29 @@ exports.searchRecipes = async (req, res) => {
 
             return res.json(formattedRecipes);
         }
-        // --- KẾT THÚC THUẬT TOÁN ---
+        
+        // Không có từ khóa thì ưu tiên Premium level cao hơn rồi tới ngày đăng
+        recipes.sort((a,b) => {
+            const aPremium = getPremiumLevel(a.is_premium);
+            const bPremium = getPremiumLevel(b.is_premium);
+            if (aPremium !== bPremium) return aPremium - bPremium;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        
+        // Format lại dữ liệu nếu không có từ khóa
+        const noKeywordFormatted = recipes.map(r => {
+            const obj = r.toObject();
+            obj.id = obj._id;
+            obj.premium_level = getPremiumLevel(obj.is_premium);
+            if (obj.author) {
+                obj.user_id = obj.author._id;
+                obj.author_is_premium = obj.author.is_premium;
+            }
+            return obj;
+        });
 
         // Nếu người dùng không nhập từ khóa (chỉ filter) thì trả về bình thường
-        res.json(recipes);
+        res.json(noKeywordFormatted);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
@@ -544,6 +611,17 @@ exports.addReview = async (req, res) => {
             admin: req.user ? req.user.id : null,
             action: "Tài khoản " + userId + " đã gửi một đánh giá mới cho công thức với nội dung: " + (normalizedComment || '[không có nội dung]').substring(0, 30) + "..."
         });
+        // gửi thông báo cho tác giả công thức nếu có đánh giá mới
+        try {
+            const recipe = await Recipe.findById(recipeId).select('author name');
+            if (recipe && recipe.author && String(recipe.author) !== String(userId)) {
+                const userData = await User.findById(userId).select('fullname');
+                const msg = `${userData?.fullname || 'Ai đó'} đã đánh giá công thức ${recipe.name || ''} của bạn.`;
+                await Notification.create({ user: recipe.author, message: msg, type: 'review' });
+            }
+        } catch (notifErr) {
+            console.error('Lỗi tạo Notification khi có review mới:', notifErr);
+        }
         res.json({ success: true, message: "Đã gửi đánh giá" });
     } catch (err) {
         console.error(err);
@@ -560,6 +638,33 @@ exports.getRecipeReviews = async (req, res) => {
             .sort({ createdAt: -1 });
 
         res.json(reviews);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Xóa review của người dùng
+exports.deleteReview = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const userId = req.user.id; // Lấy từ token sau khi verifyToken
+
+        // Tìm review
+        const review = await Review.findById(reviewId);
+        
+        if (!review) {
+            return res.status(404).json({ message: 'Đánh giá không tồn tại' });
+        }
+
+        // Kiểm tra xem người dùng có phải là người tạo review không
+        if (review.user.toString() !== userId) {
+            return res.status(403).json({ message: 'Bạn không có quyền xóa đánh giá này' });
+        }
+        // Xóa review
+        await Review.findByIdAndDelete(reviewId);
+
+        res.json({ success: true, message: 'Đã xóa đánh giá' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
@@ -612,7 +717,6 @@ exports.markAsCooked = async (req, res) => {
             admin: req.user ? req.user.id : null,
             action: "Tài khoản " + userId + " đã gửi cooksnap + đánh giá cho công thức ID: " + recipeId
         });
-
         res.json({ status: 'success', message: 'Đã lưu đánh giá và lịch sử đã nấu' });
     } catch (err) {
         console.error(err);
@@ -691,9 +795,13 @@ exports.filterRecipes = async (req, res) => {
         }
 
         if (premiumOnly === 'true') {
-            query.is_premium = true;
-        } else if (premiumOnly === 'false') {
-            query.is_premium = false;
+            query.is_premium = { $gt: 0 };
+        } else if (premiumOnly === 'false' || premiumOnly === 'free' || premiumOnly === '0') {
+            query.$or = [
+                { is_premium: 0 },
+                { is_premium: null },
+                { is_premium: { $exists: false } }
+            ];
         }
 
         let recipes = await Recipe.find(query)
@@ -738,7 +846,8 @@ exports.filterRecipes = async (req, res) => {
             obj.id = obj._id;
             obj.title = obj.name || obj.title;
             obj.image_url = obj.img || obj.image_url;
-            obj.is_vip = obj.is_premium ? 1 : 0;
+            obj.premium_level = getPremiumLevel(obj.is_premium);
+            obj.is_vip = obj.premium_level > 0 ? 1 : 0;
             obj.category = obj.category || 'Khac';
             obj.meal_type = obj.meal_type || 'Khong_xac_dinh';
 
@@ -767,8 +876,14 @@ exports.toggleVip = async (req, res) => {
         const recipe = await Recipe.findById(recipeId);
         if (!recipe) return res.status(404).json({ message: "Không tìm thấy công thức" });
 
-        await Recipe.findByIdAndUpdate(recipeId, { is_premium });
-        res.json({ status: 'success', message: is_premium ? "Đã đặt VIP" : "Đã hủy VIP" });
+        await Recipe.findByIdAndUpdate(recipeId, { is_premium: getPremiumLevel(is_premium) });
+        // gửi thông báo về cho người dùng
+        await Notification.create({
+            user: recipe.author,
+            type: 'vip_status_change',
+            message: `Công thức "${recipe.name || ''}" của bạn đã được ${getPremiumLevel(is_premium) > 0 ? 'đặt thành công thức độc quyền' : 'hủy tư cách công thức độc quyền'}.`
+        });
+        res.json({ status: 'success', message: getPremiumLevel(is_premium) > 0 ? "Đã đặt VIP" : "Đã hủy VIP" });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
@@ -814,7 +929,7 @@ exports.trackSearchClick = async (req, res) => {
         await SearchAnalytics.findOneAndUpdate(
             { keyword: keywordLower, recipe: recipeId },
             { $inc: { clicks: 1 } },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
         res.json({ success: true });
     } catch (err) {
@@ -823,8 +938,7 @@ exports.trackSearchClick = async (req, res) => {
     }
 };
 
-const RecipeReport = require('../models/RecipeReportModel');
-
+// hàm báo cáo công thức
 exports.reportRecipe = async (req, res) => {
     try {
         const { reportedRecipeId, reason } = req.body;
@@ -839,7 +953,15 @@ exports.reportRecipe = async (req, res) => {
             reportedRecipe: reportedRecipeId,
             reason: reason
         });
-
+        await ActivityLog.create({
+            admin: reporterId,
+            action: "Tài khoản " + reporterId + " đã báo cáo công thức ID: " + reportedRecipeId + " với lý do: " + reason
+        });
+        await Notification.create({
+            user: reporterId,
+            type: 'recipe_report',
+            message: `Cảm ơn bạn đã báo cáo công thức. Chúng tôi sẽ xem xét và phản hồi sớm nhất có thể.`
+        });
         res.status(201).json({ message: "Báo cáo công thức thành công!", report: newReport });
     } catch (err) {
         console.error("Lỗi báo cáo công thức:", err);

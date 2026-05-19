@@ -59,59 +59,57 @@ function App() {
   const [isMaintenance, setIsMaintenance] = useState(false); 
   const [isCheckingMaintenance, setIsCheckingMaintenance] = useState(true); 
 
+    const normalizeUserId = (value) => {
+        if (!value || value === 'undefined' || value === 'null') return null;
+        return value;
+    };
+
   useEffect(() => {
-    const userId = localStorage.getItem('eatdish_user_id');
-    const userRole = localStorage.getItem('eatdish_user_role');
-    const token = localStorage.getItem('token');
-
-    if (userId && userRole && token) {
-        setUser({ id: userId, role: userRole });
-    } else {
-        console.log("Không tìm thấy thông tin đăng nhập đầy đủ.");
-    }
-    setIsChecking(false);
-    const checkMaintenanceStatus = async () => {
+    const bootstrapAuthAndMaintenance = async () => {
         try {
-            const res = await axiosClient.get('/settings/maintenance');
-            setIsMaintenance(res.data.isMaintenance);
+            const hasLocalSessionHint = Boolean(
+                localStorage.getItem('user') ||
+                localStorage.getItem('eatdish_user_id') ||
+                localStorage.getItem('eatdish_user_role')
+            );
 
+            const mePromise = hasLocalSessionHint
+                ? axiosClient.get('/auth/me').catch((err) => {
+                    if (err?.response?.status === 401) return null;
+                    throw err;
+                })
+                : Promise.resolve(null);
+
+            const [maintenanceRes, meRes] = await Promise.all([
+                axiosClient.get('/settings/maintenance'),
+                mePromise
+            ]);
+
+            setIsMaintenance(Boolean(maintenanceRes?.data?.isMaintenance));
+
+            if (meRes?.data?.user) {
+                const realUser = meRes.data.user;
+                const realId = normalizeUserId(realUser?.id) || normalizeUserId(realUser?._id);
+
+                localStorage.setItem('eatdish_user_id', String(realId || ''));
+                localStorage.setItem('eatdish_user_role', realUser.role);
+                localStorage.setItem('user', JSON.stringify({ ...realUser, id: realId }));
+                setUser({ id: realId, role: realUser.role });
+            } else {
+                // No valid session: never trust localStorage role/user.
+                setUser(null);
+            }
         } catch (err) {
-            console.error("Lỗi lấy trạng thái bảo trì:", err);
+            console.error("Lỗi khởi tạo auth/maintenance:", err);
+            setUser(null);
         } finally {
+            setIsChecking(false);
             setIsCheckingMaintenance(false);
         }
     };
 
-    checkMaintenanceStatus();
+    bootstrapAuthAndMaintenance();
   }, []);
-  useEffect(() => {
-    const enforceTrueIdentity = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
-        try {
-            const res = await axiosClient.get('/auth/me');
-            const realUser = res.data.user;
-
-            const fakeId = localStorage.getItem('eatdish_user_id');
-            const fakeRole = localStorage.getItem('eatdish_user_role');
-
-            if (String(realUser.id) !== String(fakeId) || realUser.role !== fakeRole) {
-                console.warn("Phát hiện gian lận Local Storage! Đang khôi phục...");
-                localStorage.setItem('eatdish_user_id', realUser.id);
-                localStorage.setItem('eatdish_user_role', realUser.role);
-                localStorage.setItem('user', JSON.stringify(realUser));
-                window.location.reload(); 
-            }
-        } catch (error) {
-            // Nếu Token bị lỗi, bị fake hoặc hết hạn -> Đá văng ra chuồng gà
-            localStorage.clear();
-            window.location.href = '/login-register?expired=true';
-        }
-    };
-
-    enforceTrueIdentity();
-}, []);
   if (isCheckingMaintenance) {
       return <div style={{textAlign: 'center', marginTop: '50px', fontSize: '20px'}}>🧑‍🍳 Đang chuẩn bị nhà bếp...</div>;
   }

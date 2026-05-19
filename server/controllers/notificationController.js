@@ -17,8 +17,15 @@ exports.getUserNotifications = async (req, res) => {
 // 2. Đánh dấu tất cả là "Đã đọc" khi ấn vào cái chuông
 exports.markAsRead = async (req, res) => {
     try {
-        const { userId } = req.body;
-        await Notification.updateMany({ user: userId }, { is_read: true });
+        const { userId, notificationId } = req.body;
+        
+        // Nếu có notificationId thì chỉ mark cái đó, không thì mark tất cả
+        if (notificationId) {
+            await Notification.findByIdAndUpdate(notificationId, { is_read: true });
+        } else {
+            await Notification.updateMany({ user: userId }, { is_read: true });
+        }
+        
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -35,7 +35,7 @@ const PremiumSuccess = () => {
                 }
 
                 // Lấy thông tin gói
-                const resPkgs = await axiosClient.get('/packages');
+                const resPkgs = await axiosClient.get('/premium/packages');
                 let boughtPackage = resPkgs.data.find(p => p.id == packageId);
                 if (boughtPackage) {
                     setPackageName(boughtPackage.name);
@@ -44,7 +44,7 @@ const PremiumSuccess = () => {
 
                 // Cập nhật lại trạng thái Premium từ Server
                 try {
-                    const resStatus = await axiosClient.get(`/status?t=${Date.now()}`);
+                    const resStatus = await axiosClient.get(`/premium/status?t=${Date.now()}`);
                     const userStr = localStorage.getItem('user') || localStorage.getItem('eatdish_user');
                     if (userStr) {
                         const currentUser = JSON.parse(userStr);
@@ -94,7 +94,7 @@ const PremiumSuccess = () => {
                         <p>Đang tải đặc quyền... </p>
                     ) : benefits && benefits.length > 0 ? (
                         benefits.map((item, index) => (
-                            <p key={index}><SquareCheck /> {item}</p>
+                            <p key={index}><SquareCheck /> {typeof item === 'string' ? item : item.name || item.id}</p>
                         ))
                     ) : (
                         <>

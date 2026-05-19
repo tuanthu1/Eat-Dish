@@ -43,12 +43,15 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdateSuccess }) => 
         e.target.value = null; 
     };
 
-    // Hàm này sẽ nhận kết quả từ Component ImageCropperModal trả về
-    const handleCropComplete = (croppedFile) => {
-        // Tạo preview cho ảnh đã cắt
-        setPreviewAvatar(URL.createObjectURL(croppedFile));
-        // Lưu ảnh đã cắt để chuẩn bị bấm "Lưu thay đổi" gửi lên API
-        setAvatarFile(croppedFile);
+    const handleCropComplete = (croppedData) => {
+        // croppedData bây giờ là một object { file, url } do tao thiết kế ở Modal
+        
+        // Dùng luôn cái url có sẵn để làm preview
+        setPreviewAvatar(croppedData.url); 
+        
+        // Lưu cái file thực tế vào state để lát bấm "Lưu thay đổi" thì gửi API
+        setAvatarFile(croppedData.file); 
+        
         // Đóng modal cắt ảnh
         setImageToCrop(null);
     };
@@ -74,11 +77,11 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdateSuccess }) => 
             if (avatarFile) formData.append('avatar', avatarFile);
             if (coverFile) formData.append('cover_img', coverFile); 
             
-            const token = localStorage.getItem('token') || localStorage.getItem('ACCESS_TOKEN');
-            if (!token) { setError("Bạn chưa đăng nhập!"); setIsLoading(false); return; }
+            const userStr = localStorage.getItem('user') || localStorage.getItem('eatdish_user_id');
+            if (!userStr) { toast.error("Bạn chưa đăng nhập!"); setIsLoading(false); return; }
 
             const res = await axiosClient.put('/users/update', formData, {
-                headers: { 'Content-Type': 'multipart/form-data', 'Authorization': `Bearer ${token}` }
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
 
             if (res.data.status === 'success') {
@@ -141,8 +144,8 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdateSuccess }) => 
             <ImageCropper 
                 isOpen={!!imageToCrop} 
                 onClose={() => setImageToCrop(null)} 
-                imageFile={imageToCrop} 
-                onCropComplete={handleCropComplete}
+                imageSrc={imageToCrop}
+                onCropDone={handleCropComplete}
             />
         </>
     );

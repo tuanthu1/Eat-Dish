@@ -3,11 +3,11 @@ import axios from "axios";
 const isLocalhost = window.location.hostname === 'localhost';
 
 const axiosClient = axios.create({
-    baseURL: "http://localhost:5000/api" ,
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: isLocalhost ? "http://localhost:5000/api" : "https://eatdish.net/api", 
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 axiosClient.interceptors.response.use(
@@ -33,9 +33,10 @@ axiosClient.interceptors.response.use(
                 return Promise.reject(error);
             }
 
-            // Nếu gọi API khác mà bị 401 thì mới đá ra
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            // Xóa user info ở localStorage
+            localStorage.removeItem('user');
+            localStorage.removeItem('eatdish_user_id');
+            localStorage.removeItem('eatdish_user_role');
             window.location.href = '/login-register?expired=true';
         }
         

@@ -7,10 +7,12 @@ router.get('/maintenance', settingController.getMaintenanceStatus);
 router.get('/recipe-classifications', settingController.getRecipeClassifications);
 router.get('/category-images', settingController.getCategoryImages);
 
-router.post('/maintenance/toggle', settingController.toggleMaintenanceStatus);
+router.post('/maintenance/toggle', verifyToken, checkAdmin, settingController.toggleMaintenanceStatus);
 router.put('/notifications', verifyToken, settingController.updateNotificationSettings);
+router.get('/ai-chatbot', verifyToken, checkAdmin, settingController.getAiChatbot);
+router.put('/ai-chatbot', verifyToken, checkAdmin, settingController.updateAiChatbot);
 router.get('/recipe-banners', settingController.getRecipeBanner);
-router.put('/recipe-banners', verifyToken, settingController.updateRecipeBanner);
-router.post('/upload-banners', uploadCloud.single('image'), settingController.uploadBannerImage);
+router.put('/recipe-banners', verifyToken, checkAdmin, settingController.updateRecipeBanner);
+router.post('/upload-banners', verifyToken, checkAdmin, uploadCloud.single('image'), settingController.uploadBannerImage);
 router.put('/recipe-classifications', verifyToken, checkAdmin, settingController.updateRecipeClassifications);
 module.exports = router;

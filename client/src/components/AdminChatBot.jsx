@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import axiosClient from '../api/axiosClient';
 import linhvat from '../logo/linhvat.png';
+import Modal from './Modal';
 import './AdminChatBot.css';
 
 const AdminChatBot = () => {
@@ -12,6 +13,10 @@ const AdminChatBot = () => {
     const hasMoved = useRef(false);
     const [isTyping, setIsTyping] = useState(false);
     const [inputValue, setInputValue] = useState('');
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [pendingToken, setPendingToken] = useState(null);
+    const [pendingAction, setPendingAction] = useState(null);
+    const [isConfirming, setIsConfirming] = useState(false);
     const [messages, setMessages] = useState(() => {
         const saved = localStorage.getItem('eatdish_admin_modal_chat_history');
         if (saved) return JSON.parse(saved);
@@ -36,6 +41,26 @@ const AdminChatBot = () => {
         }
     }, [messages, isOpen, isTyping]);
 
+    // Extract token from bot reply (token format: 24 hex chars from crypto.randomBytes(12))
+    const extractToken = (text) => {
+        const match = text.match(/Token xác nhận:\s*([a-f0-9]{24})/i);
+        return match ? match[1] : null;
+    };
+
+    // Remove token message from display, keep only the first part (botReply)
+    const cleanBotReply = (text) => {
+        return text.split('\n\n⚠️')[0].trim();
+    };
+
+    // Extract action name from clean reply for modal title
+    const extractActionName = (text) => {
+        if (text.includes('xóa')) return 'Xóa dữ liệu';
+        if (text.includes('khóa')) return 'Khóa tài khoản';
+        if (text.includes('cập nhật vai trò')) return 'Cập nhật vai trò';
+        if (text.includes('khởi động')) return 'Khởi động lại server';
+        return 'Xác nhận hành động';
+    };
+
     const sendMessage = async (text) => {
         if (!text.trim()) return;
 
@@ -45,12 +70,42 @@ const AdminChatBot = () => {
 
         try {
             const res = await axiosClient.post('/admin/chat/bot', { message: text });
-            setMessages(prev => [...prev, { isBot: true, text: res.data.reply }]);
+            const botReply = res.data.reply;
+            const token = extractToken(botReply);
+            const displayText = token ? cleanBotReply(botReply) : botReply;
+            
+            setMessages(prev => [...prev, { isBot: true, text: displayText }]);
+            
+            if (token) {
+                setPendingToken(token);
+                setPendingAction(displayText);
+                setIsConfirmModalOpen(true);
+            }
         } catch (err) {
             const errorMsg = err.response?.data?.reply || 'Không thể xử lý lệnh lúc này, vui lòng thử lại.';
             setMessages(prev => [...prev, { isBot: true, text: errorMsg }]);
         } finally {
             setIsTyping(false);
+        }
+    };
+
+    const handleConfirmAction = async () => {
+        if (!pendingToken) return;
+        setIsConfirming(true);
+        try {
+            const res = await axiosClient.post('/admin/chat/bot/confirm', { token: pendingToken });
+            setMessages(prev => [...prev, { isBot: true, text: res.data.reply }]);
+            setIsConfirmModalOpen(false);
+            setPendingToken(null);
+            setPendingAction(null);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || 'Lỗi khi xác nhận hành động.';
+            setMessages(prev => [...prev, { isBot: true, text: `❌ ${errorMsg}` }]);
+            setIsConfirmModalOpen(false);
+            setPendingToken(null);
+            setPendingAction(null);
+        } finally {
+            setIsConfirming(false);
         }
     };
 
@@ -165,6 +220,56 @@ const AdminChatBot = () => {
                     </div>
                 </div>
             )}
+
+            {/* Confirm Modal */}
+            <Modal 
+                isOpen={isConfirmModalOpen} 
+                onClose={() => setIsConfirmModalOpen(false)}
+                title="Xác Nhận Hành Động"
+            >
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                    <p style={{ marginBottom: '20px', color: '#636e72', lineHeight: 1.6 }}>
+                        {pendingAction}
+                    </p>
+                    <p style={{ marginBottom: '20px', color: '#ff6b35', fontWeight: 600, fontSize: '13px' }}>
+                        ⚠️ Hành động này không thể hoàn tác. Bạn có chắc chắn?
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                        <button
+                            onClick={() => setIsConfirmModalOpen(false)}
+                            disabled={isConfirming}
+                            style={{
+                                padding: '10px 20px',
+                                border: '1px solid #ddd',
+                                background: '#f5f5f5',
+                                color: '#333',
+                                borderRadius: '6px',
+                                cursor: isConfirming ? 'not-allowed' : 'pointer',
+                                fontWeight: 600,
+                                opacity: isConfirming ? 0.6 : 1
+                            }}
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            onClick={handleConfirmAction}
+                            disabled={isConfirming}
+                            style={{
+                                padding: '10px 20px',
+                                background: '#ff6b35',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: isConfirming ? 'not-allowed' : 'pointer',
+                                fontWeight: 600,
+                                opacity: isConfirming ? 0.6 : 1
+                            }}
+                        >
+                            {isConfirming ? '⏳ Xác nhận...' : '✅ Xác Nhận'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 };

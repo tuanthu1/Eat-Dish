@@ -4,8 +4,191 @@ const CommunityPost = require('../models/CommunityPost');
 const ActivityLog = require('../models/ActivityLogModel');
 const SiteSetting = require('../models/SiteSetting');
 const Groq = require('groq-sdk');
+const OpenAI = require('openai');
+const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+
+// Load chatbot config từ admin settings
+const getChatbotConfig = async () => {
+    const setting = await SiteSetting.findOne({ key: 'ai_chatbot' });
+    return setting?.value || {};
+};
+
+// ===== GROQ FUNCTIONS =====
+const generateGroqJson = async (systemPrompt, userPrompt) => {
+    try {
+        const completion = await groq.chat.completions.create({
+            model: GROQ_MODEL,
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ]
+        });
+        return completion.choices?.[0]?.message?.content || '{}';
+    } catch (err) {
+        console.error('Groq JSON error:', err.message);
+        return '{}';
+    }
+};
+
+const generateGroqText = async (systemPrompt, userPrompt) => {
+    try {
+        const completion = await groq.chat.completions.create({
+            model: GROQ_MODEL,
+            temperature: 0.7,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ]
+        });
+        return completion.choices?.[0]?.message?.content || '';
+    } catch (err) {
+        console.error('Groq text error:', err.message);
+        return '';
+    }
+};
+
+// ===== OPENAI FUNCTIONS =====
+const generateOpenAIJson = async (apiKey, systemPrompt, userPrompt) => {
+    try {
+        const client = new OpenAI({ apiKey });
+        const completion = await client.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.1,
+            response_format: { type: 'json_object' },
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ]
+        });
+        return completion.choices?.[0]?.message?.content || '{}';
+    } catch (err) {
+        console.error('OpenAI JSON error:', err.message);
+        return '{}';
+    }
+};
+
+const generateOpenAIText = async (apiKey, systemPrompt, userPrompt) => {
+    try {
+        const client = new OpenAI({ apiKey });
+        const completion = await client.chat.completions.create({
+            model: 'gpt-4o-mini',
+            temperature: 0.7,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ]
+        });
+        return completion.choices?.[0]?.message?.content || '';
+    } catch (err) {
+        console.error('OpenAI text error:', err.message);
+        return '';
+    }
+};
+
+// ===== CLAUDE FUNCTIONS =====
+const generateClaudeJson = async (apiKey, systemPrompt, userPrompt) => {
+    try {
+        const client = new Anthropic({ apiKey });
+        const completion = await client.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1024,
+            messages: [
+                { role: 'user', content: userPrompt }
+            ],
+            system: systemPrompt
+        });
+        return completion.content?.[0]?.text || '{}';
+    } catch (err) {
+        console.error('Claude JSON error:', err.message);
+        return '{}';
+    }
+};
+
+const generateClaudeText = async (apiKey, systemPrompt, userPrompt) => {
+    try {
+        const client = new Anthropic({ apiKey });
+        const completion = await client.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 2048,
+            messages: [
+                { role: 'user', content: userPrompt }
+            ],
+            system: systemPrompt
+        });
+        return completion.content?.[0]?.text || '';
+    } catch (err) {
+        console.error('Claude text error:', err.message);
+        return '';
+    }
+};
+
+// ===== GEMINI FUNCTIONS =====
+const generateGeminiJson = async (apiKey, systemPrompt, userPrompt) => {
+    try {
+        const client = new GoogleGenerativeAI(apiKey);
+        const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const completion = await model.generateContent({
+            contents: [
+                { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
+            ]
+        });
+        return completion.response?.text() || '{}';
+    } catch (err) {
+        console.error('Gemini JSON error:', err.message);
+        return '{}';
+    }
+};
+
+const generateGeminiText = async (apiKey, systemPrompt, userPrompt) => {
+    try {
+        const client = new GoogleGenerativeAI(apiKey);
+        const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const completion = await model.generateContent({
+            contents: [
+                { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
+            ]
+        });
+        return completion.response?.text() || '';
+    } catch (err) {
+        console.error('Gemini text error:', err.message);
+        return '';
+    }
+};
+
+// ===== UNIVERSAL GENERATOR FUNCTIONS =====
+const generateJson = async (provider, apiKey, systemPrompt, userPrompt) => {
+    switch (provider.toLowerCase()) {
+        case 'openai':
+            return await generateOpenAIJson(apiKey, systemPrompt, userPrompt);
+        case 'claude':
+            return await generateClaudeJson(apiKey, systemPrompt, userPrompt);
+        case 'gemini':
+            return await generateGeminiJson(apiKey, systemPrompt, userPrompt);
+        case 'groq':
+        default:
+            return await generateGroqJson(systemPrompt, userPrompt);
+    }
+};
+
+const generateText = async (provider, apiKey, systemPrompt, userPrompt) => {
+    switch (provider.toLowerCase()) {
+        case 'openai':
+            return await generateOpenAIText(apiKey, systemPrompt, userPrompt);
+        case 'claude':
+            return await generateClaudeText(apiKey, systemPrompt, userPrompt);
+        case 'gemini':
+            return await generateGeminiText(apiKey, systemPrompt, userPrompt);
+        case 'groq':
+        default:
+            return await generateGroqText(systemPrompt, userPrompt);
+    }
+};
 
 const DEFAULT_CHAT_CATEGORIES = [
     { value: 'Mon_chinh', label: 'Món chính' },
@@ -76,30 +259,7 @@ const getChatCategories = async () => {
             label: String(item.label).trim()
         }));
 };
-async function generateGroqJson(systemPrompt, userPrompt) {
-    const completion = await groq.chat.completions.create({
-        model: GROQ_MODEL,
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-        ]
-    });
-    return completion.choices?.[0]?.message?.content || '{}';
-}
 
-async function generateGroqText(systemPrompt, userPrompt) {
-    const completion = await groq.chat.completions.create({
-        model: GROQ_MODEL,
-        temperature: 0.7,
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-        ]
-    });
-    return completion.choices?.[0]?.message?.content || '';
-}
 async function getCurrentTemperature(lat, lon, city, weatherApiKey, fallbackTemperature = 25) {
     if (weatherApiKey) {
         try {
@@ -156,8 +316,52 @@ exports.processChat = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ reply: "Vui lòng đăng nhập để trò chuyện với đầu bếp AI nhé! 👨‍🍳" });
         }
+        
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ reply: "Không tìm thấy thông tin tài khoản." });
+        
+        // Load chatbot config từ admin
+        const chatbotConfig = await getChatbotConfig();
+        if (!chatbotConfig.enabled) {
+            return res.status(200).json({ 
+                reply: "Xin lỗi, chatbot đang bảo trì. Vui lòng quay lại sau nhé! 🔧" 
+            });
+        }
+        
+        // Lấy provider và API key từ config
+        const provider = chatbotConfig.provider || 'groq';
+        let apiKey = null;
+        
+        switch (provider.toLowerCase()) {
+            case 'openai':
+                apiKey = chatbotConfig.openai_apikey;
+                break;
+            case 'groq':
+                apiKey = chatbotConfig.groq_apikey || process.env.GROQ_API_KEY;
+                break;
+            case 'claude':
+                apiKey = chatbotConfig.claude_apikey;
+                break;
+            case 'mimo':
+                apiKey = chatbotConfig.mimo_apikey;
+                break;
+            case 'gemini':
+                apiKey = chatbotConfig.gemini_apikey;
+                break;
+            case 'other':
+                apiKey = chatbotConfig.other_apikey;
+                break;
+            default:
+                apiKey = process.env.GROQ_API_KEY;
+        }
+        
+        if (!apiKey) {
+            console.error(`Không tìm thấy API key cho provider: ${provider}`);
+            return res.status(200).json({ 
+                reply: "Xin lỗi, bếp chưa cấu hình API key. Vui lòng liên hệ admin! " 
+            });
+        }
+        
         const isAdmin = user.role === 'admin';
         // Lấy nhiệt độ từ API thời tiết; nếu lỗi ở bất kỳ bước nào thì giữ mặc định 25 độ.
         const weatherApiKey = process.env.WEATHER_API_KEY;
@@ -212,7 +416,7 @@ exports.processChat = async (req, res) => {
         `;
 
         const nluSystemPrompt = "Bạn là máy phân tích ngôn ngữ tự nhiên. Chỉ trả về JSON thuần túy.";
-        const nluText = (await generateGroqJson(nluSystemPrompt, parsePrompt)).trim();
+        const nluText = (await generateJson(provider, apiKey, nluSystemPrompt, parsePrompt)).trim();
         const cleanedNluText = nluText.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
         
         let parsedData = { intent: 'chat', keywords: [], category: null, max_calo: null, max_time: null };
@@ -356,7 +560,7 @@ exports.processChat = async (req, res) => {
         `;
             
         const chatSystemPrompt = 'Bạn là Bot EatDish thân thiện, phản hồi bằng tiếng Việt chuẩn xác và tự nhiên.';
-        const chatReply = await generateGroqText(chatSystemPrompt, replyPrompt);
+        const chatReply = await generateText(provider, apiKey, chatSystemPrompt, replyPrompt);
         
         await User.findByIdAndUpdate(userId, {
             daily_chat_count: currentCount + 1,

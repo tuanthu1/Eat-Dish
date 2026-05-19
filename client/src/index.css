@@ -3428,26 +3428,27 @@ body {
 }
 
 .rs-notif-icon {
-    font-size: 14px;
-    position: fixed;
-    right: 285px;
-    position: static;
-    transform: none;
+    font-size: 20px;
+    cursor: pointer;
+    position: relative;
 }
 
 .rs-notif-badge {
     position: absolute;
-    top: -5px;
-    right: -5px;
-    background: red;
+    top: -8px;
+    right: -8px;
+    background: #e74c3c;
     color: white;
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     font-size: 12px;
+    font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .rs-notif-dropdown {
@@ -3473,8 +3474,9 @@ body {
 }
 
 .rs-notif-list {
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
+    padding: 0;
 }
 
 .rs-notif-item {
